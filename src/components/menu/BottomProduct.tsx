@@ -1,7 +1,7 @@
 import { FC, useState } from "react";
-import { CartItem, Category, Product } from ".";
+import { CartItem, Category, getPrice, Product } from ".";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../ui/drawer";
-import { sizes, toppings } from "@/data/menu";
+import { SizeId, sizes, toppings } from "@/data/menu";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
@@ -48,7 +48,7 @@ const BottomProduct: FC<BottomProductProps> = ({
       size: selectedSize,
       category: category.name,
       toppings: selectedToppings,
-      price: 50,
+      price: getOnlyPrice() ?? 0,
       quantity,
     };
 
@@ -57,6 +57,26 @@ const BottomProduct: FC<BottomProductProps> = ({
     onClose();
     console.log(item);
   };
+
+  const getOnlyPrice = () => {
+    const price = getPrice(product, selectedSize as SizeId, category.id) ?? 0;
+    if (selectedToppings.length > 1) {
+      return price + (selectedToppings.length - 1) * 10;
+    }
+    return price;
+  };
+
+  const getTotalPrice = () => {
+    console.log(selectedSize);
+    console.log(category.name);
+    const price = getPrice(product, selectedSize as SizeId, category.id) ?? 0;
+    if (selectedToppings.length > 1) {
+      return (price + (selectedToppings.length - 1) * 10) * quantity;
+    }
+    return price * quantity;
+  };
+
+  // const totalPrice = (product. + sizePrice + toppingsPrice) * quantity
 
   return (
     <Drawer open={isOpen} onOpenChange={onClose}>
@@ -71,9 +91,11 @@ const BottomProduct: FC<BottomProductProps> = ({
         <div className="px-4 pb-6 overflow-y-auto flex-1">
           {product && (
             <>
-              <p className="text-muted-foreground mb-6">
-                {product.description}
-              </p>
+              {product.description && (
+                <p className="text-sm text-muted-foreground mb-4">
+                  {product.description}
+                </p>
+              )}
 
               {/* Size Selection */}
               <div className="mb-6">
@@ -94,6 +116,10 @@ const BottomProduct: FC<BottomProductProps> = ({
                 </div>
               </div>
 
+              <span className="text-xs">
+                La bebida incluye 1 topping gratis. Cada topping adicional tiene
+                un costo de $10.
+              </span>
               {/* Toppings */}
               <div className="mb-6">
                 <h3 className="font-medium mb-3 text-popover-foreground">
@@ -178,7 +204,7 @@ const BottomProduct: FC<BottomProductProps> = ({
         <div className="border-t border-border p-4 sticky bottom-0 bg-popover shadow-lg">
           <Button onClick={handleAdd} className="w-full h-12">
             <Plus />
-            Añadir al Carrito
+            Añadir al Carrito - ${getTotalPrice().toFixed(2)}
           </Button>
         </div>
       </DrawerContent>

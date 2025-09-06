@@ -6,6 +6,7 @@ import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
 import { MessageCircle, Minus, Plus, Trash2 } from "lucide-react";
+import { Badge } from "../ui/badge";
 interface BottomCartProps {
   items: CartItem[];
   isOpen: boolean;
@@ -42,7 +43,7 @@ const BottomCart: FC<BottomCartProps> = ({
       //   message += `   • Precio: $${(item.price * item.quantity).toFixed(2)}\n\n`;
     });
 
-    // message += `Total: $${total.toFixed(2)}\n\n`;
+    message += `Total: $${total.toFixed(2)}\n\n`;
     message += `¡Gracias!`;
 
     return encodeURIComponent(message);
@@ -88,7 +89,9 @@ const BottomCart: FC<BottomCartProps> = ({
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {/* <Badge variant="secondary">${(item.price * item.quantity).toFixed(2)}</Badge> */}
+                      <Badge variant="secondary">
+                        ${(item.price * item.quantity).toFixed(2)}
+                      </Badge>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -104,7 +107,7 @@ const BottomCart: FC<BottomCartProps> = ({
               <div className="border-t pt-4 space-y-4">
                 <div className="flex justify-between items-center text-lg font-semibold">
                   <span>Total</span>
-                  {/* <span>${total.toFixed(2)}</span> */}
+                  <span>${total.toFixed(2)}</span>
                 </div>
 
                 <Button

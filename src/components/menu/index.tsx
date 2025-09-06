@@ -3,7 +3,7 @@ import Image from "next/image";
 import logo from "@/assets/images/logo.png";
 
 import { Button } from "../ui/button";
-import { categories, flavors } from "@/data/menu";
+import { categories, Flavor, flavors, priceRules, SizeId } from "@/data/menu";
 import { Card, CardContent } from "../ui/card";
 
 import { Plus, ShoppingCart } from "lucide-react";
@@ -11,6 +11,8 @@ import { useState } from "react";
 
 import BottomProduct from "./BottomProduct";
 import BottomCart from "./BottomCart";
+import frappeFresa from "@/assets/images/frappe-fresa.png";
+import { Badge } from "../ui/badge";
 
 export interface Product {
   id: string;
@@ -38,6 +40,33 @@ export interface Category {
   id: string;
   name: string;
   // emoji: string
+}
+
+export function getPrice(
+  flavor: Flavor,
+  sizeId: SizeId,
+  category: string
+): number | null {
+  // Si el sabor tiene precio personalizado
+  if (flavor.customPrice) {
+    return flavor.customPrice[sizeId];
+  }
+
+  if (category === "frappe") {
+    return priceRules[
+      flavor.tier === "premium" ? "frappePremium" : "frappeClassic"
+    ][sizeId];
+  }
+
+  if (category === "tea" || category === "soda" || category === "milkTea") {
+    return priceRules.tea[sizeId];
+  }
+
+  if (category === "specialty") {
+    return priceRules.specialty[sizeId];
+  }
+
+  return null;
 }
 const Menu = () => {
   const [selectedCategory, setSelectedCategory] = useState<Category>({
@@ -127,9 +156,18 @@ const Menu = () => {
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3"></div>
-                  <h3 className="font-semibold text-lg mb-2 text-balance">
-                    {product.name}
-                  </h3>
+                  <div className="flex gap-2 items-center relative">
+                    <h3 className="font-semibold text-lg mb-2 text-balance">
+                      {product.name}
+                    </h3>
+                    {/* <Badge
+                      // variant="secondary"
+                      className="text-xs bg-main-dream text-white absolute top-0 right-4"
+                    >
+                      ${getPrice(product, "mini")} | $
+                      {getPrice(product, "grande")}
+                    </Badge> */}
+                  </div>
                   <p className="text-sm text-muted-foreground mb-3 text-pretty">
                     {product.description}
                   </p>
@@ -153,10 +191,10 @@ const Menu = () => {
               <div className="flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5" />
                 <span>
-                  {cartItemCount} Bebida(s){cartItemCount !== 1 ? "s" : ""}
+                  {cartItemCount} Bebida{cartItemCount !== 1 ? "s" : ""}
                 </span>
               </div>
-              <span className="font-semibold"></span>
+              <span className="font-semibold">${cartTotal.toFixed(2)}</span>
             </Button>
           </div>
         </div>
