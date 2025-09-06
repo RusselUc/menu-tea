@@ -160,6 +160,7 @@ export const flavors = [
     description: "Milk de pay de calabaza",
     categories: ["specialty"],
     tier: "premium",
+    customPrice: { mini: 65, grande: 75, pandi: 80 },
   },
   {
     id: "vainilla-cookies-cream",
@@ -172,7 +173,7 @@ export const flavors = [
 
 // Toppings
 export const toppings = {
-  poppingBoba: ["Mora", "Manzana verde", "Fresa", "Chicle", "Mango"],
+  poppingBoba: ["Mora", "Manzana verde", "Fresa", "Chicle", "Mango", "Tapioca"],
   jellys: ["Mix de frutas tropicales", "Jelly de Café"],
   crystalBoba: ["Matcha"],
 };
