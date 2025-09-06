@@ -116,7 +116,7 @@ const BottomCart: FC<BottomCartProps> = ({
                   size="lg"
                 >
                   <MessageCircle className="w-5 h-5 mr-2" />
-                  Order via WhatsApp
+                  Enviar Pedido Al WhatsApp
                 </Button>
 
                 <Button
