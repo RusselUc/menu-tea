@@ -129,10 +129,11 @@ const BottomProduct: FC<BottomProductProps> = ({
                   {toppings.poppingBoba.map((popping) => (
                     <div className="flex items-center gap-3" key={popping}>
                       <Checkbox
+                        id={popping}
                         checked={selectedToppings.includes(popping)}
                         onCheckedChange={() => toggleTopping(popping)}
                       />
-                      <Label>{popping}</Label>
+                      <Label htmlFor={popping}>{popping}</Label>
                     </div>
                   ))}
                 </div>
