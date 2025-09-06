@@ -58,7 +58,11 @@ export function getPrice(
     ][sizeId];
   }
 
-  if (category === "tea" || category === "soda" || category === "milkTea") {
+  if (
+    category === "tea" ||
+    category === "sodaItaliana" ||
+    category === "milkTea"
+  ) {
     return priceRules.tea[sizeId];
   }
 

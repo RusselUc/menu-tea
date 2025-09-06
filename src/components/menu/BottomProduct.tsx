@@ -100,7 +100,7 @@ const BottomProduct: FC<BottomProductProps> = ({
               {/* Size Selection */}
               <div className="mb-6">
                 <h3 className="font-medium mb-3 text-popover-foreground">
-                  Size
+                  Tamaño
                 </h3>
                 <div className="grid grid-cols-3 gap-2">
                   {sizes.map((size) => (
