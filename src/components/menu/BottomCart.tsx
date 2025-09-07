@@ -7,12 +7,34 @@ import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
 import { MessageCircle, Minus, Plus, Trash2 } from "lucide-react";
 import { Badge } from "../ui/badge";
+import { collection, addDoc, Timestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 interface BottomCartProps {
   items: CartItem[];
   isOpen: boolean;
   onClose: () => void;
   onRemoveItem: (itemId: string) => void;
   onClearCart: () => void;
+}
+
+export async function saveOrder(order: {
+  flavor: string;
+  size: "mini" | "grande" | "pandi";
+  category: string;
+  toppings: string[];
+  price: number;
+  quantity: number;
+}) {
+  try {
+    await addDoc(collection(db, "orders"), {
+      ...order,
+      timestamp: Timestamp.now(),
+      status: "success",
+    });
+    console.log("Pedido guardado con éxito");
+  } catch (error) {
+    console.error("Error al guardar pedido:", error);
+  }
 }
 
 // max-h-96
@@ -33,6 +55,15 @@ const BottomCart: FC<BottomCartProps> = ({
     let message = `¡Hola! Me gustaría hacer un pedido en ${shopName}:\n\n`;
 
     items.forEach((item) => {
+      saveOrder({
+        flavor: item.name,
+        size: item.size as "mini" | "grande" | "pandi",
+        category: item.category,
+        toppings: item.toppings,
+        price: item.price,
+        quantity: item.quantity,
+      });
+
       message += `${item.category} - ${item.name}\n`;
       message += `   • Tamaño: ${item.size}\n`;
       // message += `   • Hielo: ${item.iceLevel}\n`
@@ -55,6 +86,8 @@ const BottomCart: FC<BottomCartProps> = ({
     onClearCart();
     onClose();
   };
+
+  console.log(items);
   return (
     <Drawer open={isOpen} onOpenChange={onClose}>
       <DrawerContent className="bg-popover">
