@@ -13,6 +13,12 @@ import frappeMaracuya from "@/assets/images/frappe/maracuya.png";
 import frappeCapuchino from "@/assets/images/frappe/capuchino.png";
 import frappeTiramisu from "@/assets/images/frappe/tiramisu.png";
 
+// SODAS
+import sodaFresa from "@/assets/images/soda/fresa.png";
+
+// MILK TEA
+import milkVainilla from "@/assets/images/milk-tea/vainilla.png";
+
 export type SizeId = "mediano" | "grande" | "pandi";
 export type CategoryId =
   | "frappe"
@@ -61,7 +67,7 @@ export const flavors = [
       frappe: frappeFresa,
       // milkTea: "/images/fresa/milkTea.png",
       // tea: "/images/fresa/tea.png",
-      // sodaItaliana: "/images/fresa/soda.png"
+      sodaItaliana: sodaFresa,
     },
   },
   {
@@ -153,6 +159,9 @@ export const flavors = [
     name: "Vainilla",
     categories: ["frappe", "milkTea"],
     tier: "classic",
+    images: {
+      milkTea: milkVainilla,
+    },
   },
   {
     id: "chocolate",
