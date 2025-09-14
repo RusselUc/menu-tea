@@ -73,6 +73,12 @@ export function getPrice(
 
   return null;
 }
+
+const getImageForProduct = (product: Flavor, categoryId: string) => {
+  if (!product.images) return null;
+  const imageMap: { [key: string]: string } = product.images;
+  return imageMap[categoryId] || null;
+};
 const Menu = () => {
   const [selectedCategory, setSelectedCategory] = useState<Category>({
     id: "frappe",
@@ -162,14 +168,26 @@ const Menu = () => {
                 <CardContent className="px-4 py-0 flex flex-col gap-2">
                   {/* <div className="flex items-start justify-between mb-3"></div> */}
                   <div className="flex gap-2 flex-col relative">
-                    {product.images && (
-                      <Image
-                        src={product.images?.[selectedCategory.id]}
-                        className="w-full h-40 object-cover rounded-t-md"
-                        alt={product.name}
-                        quality={100}
-                      />
-                    )}
+                    {(() => {
+                      const imageSrc = getImageForProduct(
+                        product as Flavor,
+                        selectedCategory.id
+                      );
+                      return imageSrc ? (
+                        <Image
+                          src={imageSrc}
+                          className="w-full h-40 object-cover rounded-t-md"
+                          alt={product.name}
+                          quality={100}
+                        />
+                      ) : (
+                        <div className="w-full h-40 bg-gray-200 rounded-t-md flex items-center justify-center">
+                          <span className="text-gray-500 text-sm">
+                            Sin imagen
+                          </span>
+                        </div>
+                      );
+                    })()}
                     <h3 className="text-xl font-black">{product.name}</h3>
                   </div>
                   <p className="text-sm text-muted-foreground mb-3 text-pretty">

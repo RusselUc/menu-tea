@@ -51,20 +51,6 @@ export const categories = [
   { id: "specialty", name: "Especiales", emoji: "🌟" },
 ];
 
-// Flavors
-// export const flavors = [
-//   "Fresa",
-//   "Kiwi",
-//   "Durazno",
-//   "Mango",
-//   "Taro",
-//   "Lichi",
-//   "Mora azul",
-//   "Maracuyá",
-//   "Mix de frutas",
-//   "Vainilla",
-// ];
-
 export const flavors = [
   {
     id: "fresa",
