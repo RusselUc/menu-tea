@@ -39,6 +39,7 @@ export interface CartItem {
 export interface Category {
   id: string;
   name: string;
+
   // emoji: string
 }
 
@@ -75,7 +76,7 @@ export function getPrice(
 const Menu = () => {
   const [selectedCategory, setSelectedCategory] = useState<Category>({
     id: "frappe",
-    name: "Frappe",
+    name: "frappe",
   });
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -117,7 +118,7 @@ const Menu = () => {
   };
 
   return (
-    <div className="bg-background min-h-screen">
+    <div className="bg-[#FFF7F9] min-h-screen">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -137,9 +138,9 @@ const Menu = () => {
                 variant={
                   selectedCategory.id === category.id ? "default" : "outline"
                 }
-                size="sm"
+                // size="sm"
                 onClick={() => setSelectedCategory(category)}
-                className="flex items-center gap-2 whitespace-nowrap border border-main-dream hover:bg-main-dream/30 transition-all"
+                className="flex items-center rounded-sm gap-2 whitespace-nowrap border border-main-dream hover:bg-main-dream/30 transition-all text-base py-4"
               >
                 {category.name}
               </Button>
@@ -155,29 +156,28 @@ const Menu = () => {
             .map((product) => (
               <Card
                 key={product.id}
-                className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
+                className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] py-4"
                 onClick={() => handleProductClick(product)}
               >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-3"></div>
-                  <div className="flex gap-2 items-center relative">
-                    <h3 className="font-semibold text-lg mb-2 text-balance">
-                      {product.name}
-                    </h3>
-                    {/* <Badge
-                      // variant="secondary"
-                      className="text-xs bg-main-dream text-white absolute top-0 right-4"
-                    >
-                      ${getPrice(product, "mini")} | $
-                      {getPrice(product, "grande")}
-                    </Badge> */}
+                <CardContent className="px-4 py-0 flex flex-col gap-2">
+                  {/* <div className="flex items-start justify-between mb-3"></div> */}
+                  <div className="flex gap-2 flex-col relative">
+                    {product.images && (
+                      <Image
+                        src={product.images?.[selectedCategory.id]}
+                        className="w-full h-40 object-cover rounded-t-md"
+                        alt={product.name}
+                        quality={100}
+                      />
+                    )}
+                    <h3 className="text-xl font-black">{product.name}</h3>
                   </div>
                   <p className="text-sm text-muted-foreground mb-3 text-pretty">
                     {product.description}
                   </p>
-                  <Button className="w-full h-12 bg-main-dream">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Añadir Al Carrito
+                  <Button className="w-full h-12 rounded-sm bg-main-dream/80 text-xl uppercase font-bold ">
+                    {/* <Plus className="w-4 h-4 mr-2" /> */}
+                    Lo quiero
                   </Button>
                 </CardContent>
               </Card>
