@@ -155,6 +155,12 @@ export const flavors = [
     tier: "classic",
   },
   {
+    id: "pina-colada",
+    name: "Piña Colada",
+    categories: ["frappe"],
+    tier: "premium",
+  },
+  {
     id: "vainilla",
     name: "Vainilla",
     categories: ["frappe", "milkTea"],
@@ -219,6 +225,12 @@ export const flavors = [
     id: "Mazapán",
     name: "Mazapán",
     categories: ["frappe", "milkTea"],
+    tier: "premium",
+  },
+  {
+    id: "caramel-macchiato",
+    name: "Caramel Macchiato",
+    categories: ["frappe"],
     tier: "premium",
   },
   {
