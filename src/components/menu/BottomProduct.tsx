@@ -22,7 +22,7 @@ const BottomProduct: FC<BottomProductProps> = ({
   category,
   onAddToCart,
 }) => {
-  const [selectedSize, setSelectedSize] = useState("mini");
+  const [selectedSize, setSelectedSize] = useState("mediano");
   const [quantity, setQuantity] = useState(1);
   const [selectedToppings, setSelectedToppings] = useState<string[]>([]);
 
