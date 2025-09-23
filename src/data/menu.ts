@@ -19,6 +19,13 @@ import sodaFresa from "@/assets/images/soda/fresa.png";
 // MILK TEA
 import milkVainilla from "@/assets/images/milk-tea/vainilla.png";
 
+// CATEGORIES
+import milkTea from "@/assets/images/categories/bubble-tea.png";
+import tea from "@/assets/images/categories/herbal-tea.png";
+import frappe from "@/assets/images/categories/frappe.png";
+import sodaItaliana from "@/assets/images/categories/drink.png";
+import specialty from "@/assets/images/categories/review.png";
+
 export type SizeId = "mediano" | "grande" | "pandi";
 export type CategoryId =
   | "frappe"
@@ -35,6 +42,7 @@ export interface Flavor {
   tier?: "classic" | "premium";
   customPrice?: PriceTable;
   images?: Partial<Record<CategoryId, string>>;
+  description?: Partial<Record<CategoryId, string>>;
 }
 
 // Sizes
@@ -50,11 +58,11 @@ export const sizes = [
 ];
 
 export const categories = [
-  { id: "frappe", name: "Frappe", emoji: "🧋" },
-  { id: "milkTea", name: "Milk Tea", emoji: "🥛" },
-  { id: "tea", name: "Té Frutal", emoji: "🍵" },
-  { id: "sodaItaliana", name: "Soda Italiana", emoji: "🥤" },
-  { id: "specialty", name: "Especiales", emoji: "🌟" },
+  { id: "frappe", name: "Frappe", image: frappe },
+  { id: "milkTea", name: "Milk Tea", image: milkTea },
+  { id: "tea", name: "Té Frutal", image: tea },
+  { id: "sodaItaliana", name: "Soda Italiana", image: sodaItaliana },
+  { id: "specialty", name: "Especiales", image: specialty },
 ];
 
 export const flavors = [
@@ -65,9 +73,14 @@ export const flavors = [
     tier: "premium",
     images: {
       frappe: frappeFresa,
-      // milkTea: "/images/fresa/milkTea.png",
-      // tea: "/images/fresa/tea.png",
       sodaItaliana: sodaFresa,
+    },
+    description: {
+      frappe: "Frappe cremoso con el dulzor natural de la fresa fresca.",
+      milkTea: "Té con leche suave con un toque frutal de fresa.",
+      tea: "Infusión ligera con notas dulces y frescas de fresa madura.",
+      sodaItaliana:
+        "Soda chispeante y refrescante con el vibrante sabor de fresa.",
     },
   },
   {
@@ -77,9 +90,12 @@ export const flavors = [
     tier: "premium",
     images: {
       frappe: frappeKiwi,
-      // milkTea: "/images/kiwi/milkTea.png",
-      // tea: "/images/kiwi/tea.png",
-      // sodaItaliana: "/images/kiwi/soda.png"
+    },
+    description: {
+      frappe: "Frappe refrescante y ácido-dulce con kiwi fresco.",
+      milkTea: "Té con leche con un toque tropical y fresco de kiwi.",
+      tea: "Té ligero con equilibrio entre acidez y dulzor del kiwi.",
+      sodaItaliana: "Soda chispeante con el frescor ácido del kiwi.",
     },
   },
   {
@@ -89,9 +105,12 @@ export const flavors = [
     tier: "premium",
     images: {
       frappe: frappeDurazno,
-      // milkTea: "/images/durazno/milkTea.png",
-      // tea: "/images/durazno/tea.png",
-      // sodaItaliana: "/images/durazno/soda.png"
+    },
+    description: {
+      frappe: "Frappe cremoso y dulce con el sabor jugoso del durazno.",
+      milkTea: "Té con leche suave con un matiz afrutado de durazno.",
+      tea: "Té refrescante con notas dulces de durazno maduro.",
+      sodaItaliana: "Soda ligera y chispeante con esencia de durazno.",
     },
   },
   {
@@ -101,9 +120,12 @@ export const flavors = [
     categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
     images: {
       frappe: frappeMango,
-      // milkTea: "/images/mango/milkTea.png",
-      // tea: "/images/mango/tea.png",
-      // sodaItaliana: "/images/mango/soda.png"
+    },
+    description: {
+      frappe: "Frappe tropical y cremoso con jugo natural de mango.",
+      milkTea: "Té con leche con un toque tropical y dulce de mango.",
+      tea: "Té refrescante con el sabor jugoso del mango maduro.",
+      sodaItaliana: "Soda burbujeante con notas dulces y tropicales de mango.",
     },
   },
   {
@@ -113,9 +135,10 @@ export const flavors = [
     tier: "classic",
     images: {
       frappe: frappeTaro,
-      // milkTea: "/images/taro/milkTea.png",
-      // tea: "/images/taro/tea.png",
-      // sodaItaliana: "/images/taro/soda.png"
+    },
+    description: {
+      frappe: "Frappe cremoso con el sabor dulce y único del taro.",
+      milkTea: "Té con leche aterciopelado y delicado con esencia de taro.",
     },
   },
   {
@@ -123,6 +146,12 @@ export const flavors = [
     name: "Lichi",
     categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
     tier: "premium",
+    description: {
+      frappe: "Frappe exótico y refrescante con dulzor tropical de lichi.",
+      milkTea: "Té con leche delicado con un toque floral de lichi.",
+      tea: "Té ligero y fresco con el sabor dulce del lichi.",
+      sodaItaliana: "Soda chispeante y exótica con esencia de lichi.",
+    },
   },
   {
     id: "mora-azul",
@@ -131,9 +160,12 @@ export const flavors = [
     tier: "premium",
     images: {
       frappe: frappeMoraAzul,
-      // milkTea: "/images/mora-azul/milkTea.png",
-      // tea: "/images/mora-azul/tea.png",
-      // sodaItaliana: "/images/mora-azul/soda.png"
+    },
+    description: {
+      frappe: "Frappe vibrante con el sabor intenso de la mora azul.",
+      milkTea: "Té con leche con un toque frutal de mora azul.",
+      tea: "Té refrescante y ligeramente ácido con notas de mora azul.",
+      sodaItaliana: "Soda burbujeante con el frescor dulce de mora azul.",
     },
   },
   {
@@ -143,9 +175,12 @@ export const flavors = [
     tier: "premium",
     images: {
       frappe: frappeMaracuya,
-      // milkTea: "/images/maracuya/milkTea.png",
-      // tea: "/images/maracuya/tea.png",
-      // sodaItaliana: "/images/maracuya/soda.png"
+    },
+    description: {
+      frappe: "Frappe tropical y ácido-dulce con maracuyá fresco.",
+      milkTea: "Té con leche cremoso con un toque cítrico de maracuyá.",
+      tea: "Té ligero y exótico con notas refrescantes de maracuyá.",
+      sodaItaliana: "Soda chispeante con el sabor vibrante del maracuyá.",
     },
   },
   {
@@ -153,12 +188,21 @@ export const flavors = [
     name: "Mix de frutas",
     categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
     tier: "classic",
+    description: {
+      frappe: "Frappe lleno de energía con una mezcla tropical de frutas.",
+      milkTea: "Té con leche con un toque frutal variado y refrescante.",
+      tea: "Infusión fresca con el equilibrio de varias frutas.",
+      sodaItaliana: "Soda chispeante con un mix de frutas tropicales.",
+    },
   },
   {
     id: "pina-colada",
     name: "Piña Colada",
     categories: ["frappe"],
     tier: "premium",
+    description: {
+      frappe: "Frappe tropical con la dulzura de la piña y suavidad del coco.",
+    },
   },
   {
     id: "vainilla",
@@ -168,12 +212,19 @@ export const flavors = [
     images: {
       milkTea: milkVainilla,
     },
+    description: {
+      frappe: "Frappe cremoso con la dulzura clásica de la vainilla.",
+      milkTea: "Té con leche suave con un toque aterciopelado de vainilla.",
+    },
   },
   {
     id: "chocolate",
     name: "Chocolate Blanco",
     categories: ["frappe"],
     tier: "premium",
+    description: {
+      frappe: "Frappe dulce y cremoso con chocolate blanco fundido.",
+    },
   },
   {
     id: "capuchino",
@@ -183,12 +234,20 @@ export const flavors = [
     images: {
       frappe: frappeCapuchino,
     },
+    description: {
+      frappe: "Frappe con el intenso sabor del café capuchino.",
+      milkTea: "Té con leche con un toque de café estilo capuchino.",
+    },
   },
   {
     id: "moca",
     name: "Moca",
     categories: ["frappe", "milkTea"],
     tier: "classic",
+    description: {
+      frappe: "Frappe cremoso con la mezcla perfecta de café y chocolate.",
+      milkTea: "Té con leche con un balance de café y cacao.",
+    },
   },
   {
     id: "Tiramisú",
@@ -198,23 +257,41 @@ export const flavors = [
     images: {
       frappe: frappeTiramisu,
     },
+    description: {
+      frappe: "Frappe inspirado en el clásico postre tiramisú italiano.",
+      milkTea: "Té con leche con un toque dulce y aterciopelado de tiramisú.",
+    },
   },
   {
     id: "Frambuesa",
     name: "Frambuesa",
     categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
     tier: "premium",
+    description: {
+      frappe: "Frappe fresco con el dulzor ácido de la frambuesa.",
+      milkTea: "Té con leche con un toque frutal de frambuesa.",
+      tea: "Té ligero con un matiz dulce y ácido de frambuesa.",
+      sodaItaliana: "Soda burbujeante con la frescura vibrante de frambuesa.",
+    },
   },
   {
     id: "manzana-verde",
     name: "Manzana verde",
     categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
     tier: "premium",
+    description: {
+      frappe: "Frappe refrescante y ácido con manzana verde.",
+      milkTea: "Té con leche con un sutil toque ácido de manzana verde.",
+      tea: "Té ligero y refrescante con la frescura de la manzana verde.",
+      sodaItaliana: "Soda chispeante con el sabor crujiente de manzana verde.",
+    },
   },
   {
     id: "chocho-berry",
     name: "Chocho Berry",
-    description: "Frappe de chocolate blanco con fresa",
+    description: {
+      specialty: "Frappe de chocolate blanco con fresa",
+    },
     categories: ["specialty"],
     tier: "premium",
     images: {
@@ -226,31 +303,39 @@ export const flavors = [
     name: "Mazapán",
     categories: ["frappe", "milkTea"],
     tier: "premium",
+    description: {
+      frappe: "Frappe dulce y cremoso con el sabor clásico del mazapán.",
+      milkTea: "Té con leche suave con esencia de mazapán.",
+    },
   },
   {
     id: "caramel-macchiato",
     name: "Caramel Macchiato",
     categories: ["frappe"],
     tier: "premium",
+    description: {
+      frappe: "Frappe cremoso con café espresso y un toque de caramelo.",
+    },
   },
   {
     id: "pumpkin-horchata",
     name: "Pumpkin Horchata",
-    description: "Milk de pay de calabaza con horchata",
+    description: {
+      specialty: "Milk de pay de calabaza con horchata",
+    },
     categories: ["specialty"],
     tier: "premium",
     customPrice: { mediano: 65, grande: 75, pandi: 80 },
     images: {
       specialty: pumpkin,
-      // milkTea: "/images/fresa/milkTea.png",
-      // tea: "/images/fresa/tea.png",
-      // sodaItaliana: "/images/fresa/soda.png"
     },
   },
   {
     id: "vainilla-cookies-cream",
     name: "Vainilla Cookies & Cream",
-    description: "Milk de vainilla con galleta oreo y cheese foam",
+    description: {
+      specialty: "Milk de vainilla con galleta oreo y cheese foam",
+    },
     categories: ["specialty"],
     tier: "premium",
     images: {

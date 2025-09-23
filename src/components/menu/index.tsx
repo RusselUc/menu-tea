@@ -17,7 +17,6 @@ import { Badge } from "../ui/badge";
 export interface Product {
   id: string;
   name: string;
-  description?: string;
   categories: string[];
   // emoji: string
   //   basePrice: number;
@@ -79,6 +78,12 @@ const getImageForProduct = (product: Flavor, categoryId: string) => {
   const imageMap: { [key: string]: string } = product.images;
   return imageMap[categoryId] || null;
 };
+
+const getDescriptionForProduct = (product: Flavor, categoryId: string) => {
+  if (!product.description) return null;
+  const descriptionMap: { [key: string]: string } = product.description;
+  return descriptionMap[categoryId] || null;
+};
 const Menu = () => {
   const [selectedCategory, setSelectedCategory] = useState<Category>({
     id: "frappe",
@@ -125,7 +130,7 @@ const Menu = () => {
 
   return (
     <div className="bg-[#FFF7F9] min-h-screen">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+      <header className="sticky top-0 z-40 bg-main-dream">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
@@ -135,7 +140,7 @@ const Menu = () => {
         </div>
       </header>
 
-      <div className="sticky top-[70px] z-30  backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border bg-red-500">
+      <div className="sticky top-[70px] z-30  bg-main-dream rounded-b-[28px]">
         <div className="container mx-auto px-4 py-3">
           <div className="flex gap-2 overflow-x-auto">
             {categories.map((category) => (
@@ -146,8 +151,14 @@ const Menu = () => {
                 }
                 // size="sm"
                 onClick={() => setSelectedCategory(category)}
-                className="flex items-center rounded-sm gap-2 whitespace-nowrap border border-main-dream hover:bg-main-dream/30 transition-all text-base py-4"
+                className="flex flex-col items-center rounded-sm gap-1 whitespace-nowrap border h-auto border-main-dream hover:bg-main-dream/30 transition-all text-xs"
               >
+                <Image
+                  src={category.image}
+                  alt={category.name}
+                  className="w-5 h-5 object-cover"
+                />
+
                 {category.name}
               </Button>
             ))}
@@ -160,45 +171,58 @@ const Menu = () => {
           {flavors
             .filter((flavor) => flavor.categories.includes(selectedCategory.id))
             .map((product) => (
-              <Card
+              <div
+                className="flex gap-4 justify-between p-4 "
                 key={product.id}
-                className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] py-4"
                 onClick={() => handleProductClick(product)}
               >
-                <CardContent className="px-4 py-0 flex flex-col gap-2">
-                  {/* <div className="flex items-start justify-between mb-3"></div> */}
-                  <div className="flex gap-2 flex-col relative">
-                    {(() => {
-                      const imageSrc = getImageForProduct(
-                        product as Flavor,
-                        selectedCategory.id
-                      );
-                      return imageSrc ? (
-                        <Image
-                          src={imageSrc}
-                          className="w-full h-40 object-cover rounded-t-md"
-                          alt={product.name}
-                          quality={100}
-                        />
-                      ) : (
-                        <div className="w-full h-40 bg-gray-200 rounded-t-md flex items-center justify-center">
-                          <span className="text-gray-500 text-sm">
-                            Sin imagen
-                          </span>
-                        </div>
-                      );
-                    })()}
-                    <h3 className="text-xl font-black">{product.name}</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-3 text-pretty">
-                    {product.description}
-                  </p>
-                  <Button className="w-full h-12 rounded-sm bg-main-dream/80 text-xl uppercase font-bold ">
-                    {/* <Plus className="w-4 h-4 mr-2" /> */}
-                    Lo quiero
+                <div className="flex-1 flex flex-col gap-2 justify-between">
+                  <h3 className="text-xl font-medium tracking-widest mb-2">
+                    {product.name}
+                  </h3>
+
+                  {(() => {
+                    const description = getDescriptionForProduct(
+                      product as Flavor,
+                      selectedCategory.id
+                    );
+
+                    return description ? (
+                      <p className="text-sm text-muted-foreground mb-3 text-pretty">
+                        {description}
+                      </p>
+                    ) : null;
+                  })()}
+                  <Button
+                    // onClick={() => handleProductClick(product)}
+                    className="w-full h-6 rounded-sm bg-main-dream/80 text-sm uppercase font-bold "
+                  >
+                    Ordenar
                   </Button>
-                </CardContent>
-              </Card>
+                </div>
+                <div className="flex-1">
+                  {(() => {
+                    const imageSrc = getImageForProduct(
+                      product as Flavor,
+                      selectedCategory.id
+                    );
+                    return imageSrc ? (
+                      <Image
+                        src={imageSrc}
+                        className="w-40 h-full object-cover rounded-3xl"
+                        alt={product.name}
+                        quality={100}
+                      />
+                    ) : (
+                      <div className="h-40 w-40 bg-gray-200 rounded-3xl flex items-center justify-center">
+                        <span className="text-gray-500 text-sm">
+                          Sin imagen
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
             ))}
         </div>
       </div>

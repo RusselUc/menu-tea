@@ -91,11 +91,11 @@ const BottomProduct: FC<BottomProductProps> = ({
         <div className="px-4 pb-6 overflow-y-auto flex-1">
           {product && (
             <>
-              {product.description && (
+              {/* {product.description && (
                 <p className="text-sm text-muted-foreground mb-4">
                   {product.description}
                 </p>
-              )}
+              )} */}
 
               {/* Size Selection */}
               <div className="mb-6">
