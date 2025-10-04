@@ -9,13 +9,22 @@ import L from "leaflet";
 import { useParams } from "next/navigation";
 import { db } from "@/lib/firebase";
 
+import motoDelivery from "@/assets/images/repartidor.png";
+
 // Icono predeterminado de Leaflet
 // delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+// L.Icon.Default.mergeOptions({
+//   iconRetinaUrl:
+//     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+//   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+//   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+// });
+
+const customIcon = L.icon({
+  iconUrl: motoDelivery.src,
+  iconSize: [38, 38],
+  iconAnchor: [19, 38],
+  popupAnchor: [0, -38],
 });
 
 export default function WatchPosition() {
@@ -47,7 +56,7 @@ export default function WatchPosition() {
         style={{ height: "100%", width: "100%" }}
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        <Marker position={position} />
+        <Marker position={position} icon={customIcon} />
       </MapContainer>
     </div>
   );
