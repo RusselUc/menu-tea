@@ -342,6 +342,28 @@ export const flavors = [
       specialty: vainillaCookies,
     },
   },
+  {
+    id: "chocopeach",
+    name: "ChocoPeach",
+    description: {
+      specialty: "Frappe de chocolate blanco con durazno",
+    },
+    categories: ["specialty"],
+    tier: "premium",
+    // images: {
+    //   specialty: vainillaCookies,
+    // },
+  },
+  {
+    id: "pumpkinpie",
+    name: "Pumpkin Pie",
+    description: {
+      specialty:
+        "Frappe cremoso, con notas de canela y calabaza que lo hacen irresistible",
+    },
+    categories: ["specialty"],
+    tier: "premium",
+  },
 ];
 
 // Toppings
