@@ -19,7 +19,7 @@ interface BottomCartProps {
 
 export async function saveOrder(order: {
   flavor: string;
-  size: "mini" | "grande" | "pandi";
+  size: "mediano" | "grande" | "pandi";
   category: string;
   toppings: string[];
   price: number;
@@ -57,7 +57,7 @@ const BottomCart: FC<BottomCartProps> = ({
     items.forEach((item) => {
       saveOrder({
         flavor: item.name,
-        size: item.size as "mini" | "grande" | "pandi",
+        size: item.size as "mediano" | "grande" | "pandi",
         category: item.category,
         toppings: item.toppings,
         price: item.price,

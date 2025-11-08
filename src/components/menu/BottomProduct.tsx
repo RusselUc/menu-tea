@@ -35,7 +35,7 @@ const BottomProduct: FC<BottomProductProps> = ({
   };
 
   const resetForm = () => {
-    setSelectedSize("mini");
+    setSelectedSize("mediano");
     setSelectedToppings([]);
     setQuantity(1);
   };

@@ -141,18 +141,18 @@ export const flavors = [
       milkTea: "Té con leche aterciopelado y delicado con esencia de taro.",
     },
   },
-  {
-    id: "lichi",
-    name: "Lichi",
-    categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
-    tier: "premium",
-    description: {
-      frappe: "Frappe exótico y refrescante con dulzor tropical de lichi.",
-      milkTea: "Té con leche delicado con un toque floral de lichi.",
-      tea: "Té ligero y fresco con el sabor dulce del lichi.",
-      sodaItaliana: "Soda chispeante y exótica con esencia de lichi.",
-    },
-  },
+  // {
+  //   id: "lichi",
+  //   name: "Lichi",
+  //   categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
+  //   tier: "premium",
+  //   description: {
+  //     frappe: "Frappe exótico y refrescante con dulzor tropical de lichi.",
+  //     milkTea: "Té con leche delicado con un toque floral de lichi.",
+  //     tea: "Té ligero y fresco con el sabor dulce del lichi.",
+  //     sodaItaliana: "Soda chispeante y exótica con esencia de lichi.",
+  //   },
+  // },
   {
     id: "mora-azul",
     name: "Mora azul",
@@ -368,7 +368,7 @@ export const flavors = [
 
 // Toppings
 export const toppings = {
-  poppingBoba: ["Mora", "Manzana verde", "Fresa", "Chicle", "Mango", "Tapioca"],
+  poppingBoba: ["Mora", "Manzana verde", "Fresa", "Chicle", "Mango"],
   jellys: ["Mix de frutas tropicales", "Jelly de Café"],
   crystalBoba: ["Matcha"],
 };
