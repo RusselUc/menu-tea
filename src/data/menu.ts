@@ -317,19 +317,19 @@ export const flavors = [
       frappe: "Frappe cremoso con café espresso y un toque de caramelo.",
     },
   },
-  {
-    id: "pumpkin-horchata",
-    name: "Pumpkin Horchata",
-    description: {
-      specialty: "Milk de pay de calabaza con horchata",
-    },
-    categories: ["specialty"],
-    tier: "premium",
-    customPrice: { mediano: 65, grande: 75, pandi: 80 },
-    images: {
-      specialty: pumpkin,
-    },
-  },
+  // {
+  //   id: "pumpkin-horchata",
+  //   name: "Pumpkin Horchata",
+  //   description: {
+  //     specialty: "Milk de pay de calabaza con horchata",
+  //   },
+  //   categories: ["specialty"],
+  //   tier: "premium",
+  //   customPrice: { mediano: 65, grande: 75, pandi: 80 },
+  //   images: {
+  //     specialty: pumpkin,
+  //   },
+  // },
   {
     id: "vainilla-cookies-cream",
     name: "Vainilla Cookies & Cream",
@@ -354,23 +354,23 @@ export const flavors = [
     //   specialty: vainillaCookies,
     // },
   },
-  {
-    id: "pumpkinpie",
-    name: "Pumpkin Pie",
-    description: {
-      specialty:
-        "Frappe cremoso, con notas de canela y calabaza que lo hacen irresistible",
-    },
-    categories: ["specialty"],
-    tier: "premium",
-  },
+  // {
+  //   id: "pumpkinpie",
+  //   name: "Pumpkin Pie",
+  //   description: {
+  //     specialty:
+  //       "Frappe cremoso, con notas de canela y calabaza que lo hacen irresistible",
+  //   },
+  //   categories: ["specialty"],
+  //   tier: "premium",
+  // },
 ];
 
 // Toppings
 export const toppings = {
   poppingBoba: ["Mora", "Manzana verde", "Fresa", "Chicle", "Mango"],
   jellys: ["Mix de frutas tropicales", "Jelly de Café"],
-  crystalBoba: ["Matcha"],
+  // crystalBoba: ["Matcha"],
 };
 
 export const priceRules: Record<
