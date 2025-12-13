@@ -160,7 +160,7 @@ const BottomProduct: FC<BottomProductProps> = ({
                 <h3 className="font-medium mb-3 text-popover-foreground">
                   Crystal Bobba
                 </h3>
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   {toppings.crystalBoba.map((crystal) => (
                     <div className="flex items-center gap-3" key={crystal}>
                       <Checkbox
@@ -170,7 +170,7 @@ const BottomProduct: FC<BottomProductProps> = ({
                       <Label>{crystal}</Label>
                     </div>
                   ))}
-                </div>
+                </div> */}
               </div>
 
               {/* Cantidad */}
