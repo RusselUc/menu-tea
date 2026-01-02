@@ -86,7 +86,7 @@ export const flavors = [
   {
     id: "kiwi",
     name: "Kiwi",
-    categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
+    categories: ["frappe", "tea", "sodaItaliana"],
     tier: "premium",
     images: {
       frappe: frappeKiwi,
@@ -153,25 +153,25 @@ export const flavors = [
   //     sodaItaliana: "Soda chispeante y exótica con esencia de lichi.",
   //   },
   // },
-  {
-    id: "mora-azul",
-    name: "Mora azul",
-    categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
-    tier: "premium",
-    images: {
-      frappe: frappeMoraAzul,
-    },
-    description: {
-      frappe: "Frappe vibrante con el sabor intenso de la mora azul.",
-      milkTea: "Té con leche con un toque frutal de mora azul.",
-      tea: "Té refrescante y ligeramente ácido con notas de mora azul.",
-      sodaItaliana: "Soda burbujeante con el frescor dulce de mora azul.",
-    },
-  },
+  // {
+  //   id: "mora-azul",
+  //   name: "Mora azul",
+  //   categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
+  //   tier: "premium",
+  //   images: {
+  //     frappe: frappeMoraAzul,
+  //   },
+  //   description: {
+  //     frappe: "Frappe vibrante con el sabor intenso de la mora azul.",
+  //     milkTea: "Té con leche con un toque frutal de mora azul.",
+  //     tea: "Té refrescante y ligeramente ácido con notas de mora azul.",
+  //     sodaItaliana: "Soda burbujeante con el frescor dulce de mora azul.",
+  //   },
+  // },
   {
     id: "maracuya",
     name: "Maracuyá",
-    categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
+    categories: ["frappe", "tea", "sodaItaliana"],
     tier: "premium",
     images: {
       frappe: frappeMaracuya,
@@ -274,18 +274,18 @@ export const flavors = [
       sodaItaliana: "Soda burbujeante con la frescura vibrante de frambuesa.",
     },
   },
-  {
-    id: "manzana-verde",
-    name: "Manzana verde",
-    categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
-    tier: "premium",
-    description: {
-      frappe: "Frappe refrescante y ácido con manzana verde.",
-      milkTea: "Té con leche con un sutil toque ácido de manzana verde.",
-      tea: "Té ligero y refrescante con la frescura de la manzana verde.",
-      sodaItaliana: "Soda chispeante con el sabor crujiente de manzana verde.",
-    },
-  },
+  // {
+  //   id: "manzana-verde",
+  //   name: "Manzana verde",
+  //   categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
+  //   tier: "premium",
+  //   description: {
+  //     frappe: "Frappe refrescante y ácido con manzana verde.",
+  //     milkTea: "Té con leche con un sutil toque ácido de manzana verde.",
+  //     tea: "Té ligero y refrescante con la frescura de la manzana verde.",
+  //     sodaItaliana: "Soda chispeante con el sabor crujiente de manzana verde.",
+  //   },
+  // },
   {
     id: "chocho-berry",
     name: "Chocho Berry",
@@ -377,9 +377,9 @@ export const priceRules: Record<
   "frappeClassic" | "frappePremium" | "tea" | "sodaItaliana" | "specialty",
   PriceTable
 > = {
-  frappeClassic: { mediano: 65, grande: 75, pandi: 80 },
+  frappeClassic: { mediano: 70, grande: 80, pandi: 85 },
   frappePremium: { mediano: 70, grande: 80, pandi: 85 },
-  tea: { mediano: 65, grande: 75, pandi: 80 },
+  tea: { mediano: 70, grande: 80, pandi: 85 },
   sodaItaliana: { mediano: 65, grande: 75, pandi: 80 },
   specialty: { mediano: 70, grande: 80, pandi: 85 },
 };
