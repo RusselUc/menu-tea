@@ -12,6 +12,7 @@ import frappeMoraAzul from "@/assets/images/frappe/mora.png";
 import frappeMaracuya from "@/assets/images/frappe/maracuya.png";
 import frappeCapuchino from "@/assets/images/frappe/capuchino.png";
 import frappeTiramisu from "@/assets/images/frappe/tiramisu.png";
+import frappeRedVelvet from "@/assets/images/specialty/red-velvet.jpeg";
 
 // SODAS
 import sodaFresa from "@/assets/images/soda/fresa.png";
@@ -296,6 +297,23 @@ export const flavors = [
     tier: "premium",
     images: {
       specialty: chocoberry,
+    },
+  },
+  {
+    id: "red-velvet",
+    name: "Red Velvet",
+    description: {
+      specialty: "Frappe de red velvet con cheese foam",
+    },
+    categories: ["specialty"],
+    tier: "premium",
+    images: {
+      specialty: frappeRedVelvet,
+    },
+    customPrice: {
+      mediano: 75,
+      grande: 85,
+      pandi: 90,
     },
   },
   {
