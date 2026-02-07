@@ -13,6 +13,7 @@ import frappeMaracuya from "@/assets/images/frappe/maracuya.png";
 import frappeCapuchino from "@/assets/images/frappe/capuchino.png";
 import frappeTiramisu from "@/assets/images/frappe/tiramisu.png";
 import frappeRedVelvet from "@/assets/images/specialty/red-velvet.jpeg";
+import chocoreta from "@/assets/images/specialty/chocoreta.png";
 
 // SODAS
 import sodaFresa from "@/assets/images/soda/fresa.png";
@@ -309,6 +310,23 @@ export const flavors = [
     tier: "premium",
     images: {
       specialty: frappeRedVelvet,
+    },
+    customPrice: {
+      mediano: 75,
+      grande: 85,
+      pandi: 90,
+    },
+  },
+  {
+    id: "chocoreta",
+    name: "Chocoreta",
+    description: {
+      specialty: "Frappe de chocoreta con cheese foam",
+    },
+    categories: ["specialty"],
+    tier: "premium",
+    images: {
+      specialty: chocoreta,
     },
     customPrice: {
       mediano: 75,
