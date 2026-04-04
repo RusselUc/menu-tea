@@ -62,7 +62,7 @@ export const sizes = [
 
 export const categories = [
   { id: "frappe", name: "Frappe", image: frappe },
-  { id: "milkTea", name: "Milk Tea", image: milkTea },
+  // { id: "milkTea", name: "Milk Tea", image: milkTea },
   { id: "tea", name: "Té Frutal", image: tea },
   { id: "sodaItaliana", name: "Soda Italiana", image: sodaItaliana },
   { id: "specialty", name: "Especiales", image: specialty },
@@ -101,49 +101,49 @@ export const flavors = [
       sodaItaliana: "Soda chispeante con el frescor ácido del kiwi.",
     },
   },
-  {
-    id: "durazno",
-    name: "Durazno",
-    categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
-    tier: "premium",
-    images: {
-      frappe: frappeDurazno,
-    },
-    description: {
-      frappe: "Frappe cremoso y dulce con el sabor jugoso del durazno.",
-      milkTea: "Té con leche suave con un matiz afrutado de durazno.",
-      tea: "Té refrescante con notas dulces de durazno maduro.",
-      sodaItaliana: "Soda ligera y chispeante con esencia de durazno.",
-    },
-  },
-  {
-    id: "mango",
-    name: "Mango",
-    tier: "premium",
-    categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
-    images: {
-      frappe: frappeMango,
-    },
-    description: {
-      frappe: "Frappe tropical y cremoso con jugo natural de mango.",
-      milkTea: "Té con leche con un toque tropical y dulce de mango.",
-      tea: "Té refrescante con el sabor jugoso del mango maduro.",
-      sodaItaliana: "Soda burbujeante con notas dulces y tropicales de mango.",
-    },
-  },
-  {
-    id: "taro",
-    name: "Taro",
-    categories: ["frappe", "milkTea"],
-    tier: "classic",
-    images: {
-      frappe: frappeTaro,
-    },
-    description: {
-      frappe: "Frappe cremoso con el sabor dulce y único del taro.",
-      milkTea: "Té con leche aterciopelado y delicado con esencia de taro.",
-    },
-  },
+  // {
+  //   id: "durazno",
+  //   name: "Durazno",
+  //   categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
+  //   tier: "premium",
+  //   images: {
+  //     frappe: frappeDurazno,
+  //   },
+  //   description: {
+  //     frappe: "Frappe cremoso y dulce con el sabor jugoso del durazno.",
+  //     milkTea: "Té con leche suave con un matiz afrutado de durazno.",
+  //     tea: "Té refrescante con notas dulces de durazno maduro.",
+  //     sodaItaliana: "Soda ligera y chispeante con esencia de durazno.",
+  //   },
+  // },
+  // {
+  //   id: "mango",
+  //   name: "Mango",
+  //   tier: "premium",
+  //   categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
+  //   images: {
+  //     frappe: frappeMango,
+  //   },
+  //   description: {
+  //     frappe: "Frappe tropical y cremoso con jugo natural de mango.",
+  //     milkTea: "Té con leche con un toque tropical y dulce de mango.",
+  //     tea: "Té refrescante con el sabor jugoso del mango maduro.",
+  //     sodaItaliana: "Soda burbujeante con notas dulces y tropicales de mango.",
+  //   },
+  // },
+  // {
+  //   id: "taro",
+  //   name: "Taro",
+  //   categories: ["frappe", "milkTea"],
+  //   tier: "classic",
+  //   images: {
+  //     frappe: frappeTaro,
+  //   },
+  //   description: {
+  //     frappe: "Frappe cremoso con el sabor dulce y único del taro.",
+  //     milkTea: "Té con leche aterciopelado y delicado con esencia de taro.",
+  //   },
+  // },
   // {
   //   id: "lichi",
   //   name: "Lichi",
@@ -186,27 +186,27 @@ export const flavors = [
       sodaItaliana: "Soda chispeante con el sabor vibrante del maracuyá.",
     },
   },
-  {
-    id: "mix-de-frutas",
-    name: "Mix de frutas",
-    categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
-    tier: "classic",
-    description: {
-      frappe: "Frappe lleno de energía con una mezcla tropical de frutas.",
-      milkTea: "Té con leche con un toque frutal variado y refrescante.",
-      tea: "Infusión fresca con el equilibrio de varias frutas.",
-      sodaItaliana: "Soda chispeante con un mix de frutas tropicales.",
-    },
-  },
-  {
-    id: "pina-colada",
-    name: "Piña Colada",
-    categories: ["frappe"],
-    tier: "premium",
-    description: {
-      frappe: "Frappe tropical con la dulzura de la piña y suavidad del coco.",
-    },
-  },
+  // {
+  //   id: "mix-de-frutas",
+  //   name: "Mix de frutas",
+  //   categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
+  //   tier: "classic",
+  //   description: {
+  //     frappe: "Frappe lleno de energía con una mezcla tropical de frutas.",
+  //     milkTea: "Té con leche con un toque frutal variado y refrescante.",
+  //     tea: "Infusión fresca con el equilibrio de varias frutas.",
+  //     sodaItaliana: "Soda chispeante con un mix de frutas tropicales.",
+  //   },
+  // },
+  // {
+  //   id: "pina-colada",
+  //   name: "Piña Colada",
+  //   categories: ["frappe"],
+  //   tier: "premium",
+  //   description: {
+  //     frappe: "Frappe tropical con la dulzura de la piña y suavidad del coco.",
+  //   },
+  // },
   {
     id: "vainilla",
     name: "Vainilla",
@@ -265,18 +265,18 @@ export const flavors = [
       milkTea: "Té con leche con un toque dulce y aterciopelado de tiramisú.",
     },
   },
-  {
-    id: "Frambuesa",
-    name: "Frambuesa",
-    categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
-    tier: "premium",
-    description: {
-      frappe: "Frappe fresco con el dulzor ácido de la frambuesa.",
-      milkTea: "Té con leche con un toque frutal de frambuesa.",
-      tea: "Té ligero con un matiz dulce y ácido de frambuesa.",
-      sodaItaliana: "Soda burbujeante con la frescura vibrante de frambuesa.",
-    },
-  },
+  // {
+  //   id: "Frambuesa",
+  //   name: "Frambuesa",
+  //   categories: ["frappe", "milkTea", "tea", "sodaItaliana"],
+  //   tier: "premium",
+  //   description: {
+  //     frappe: "Frappe fresco con el dulzor ácido de la frambuesa.",
+  //     milkTea: "Té con leche con un toque frutal de frambuesa.",
+  //     tea: "Té ligero con un matiz dulce y ácido de frambuesa.",
+  //     sodaItaliana: "Soda burbujeante con la frescura vibrante de frambuesa.",
+  //   },
+  // },
   // {
   //   id: "manzana-verde",
   //   name: "Manzana verde",
@@ -353,16 +353,16 @@ export const flavors = [
       pandi: 90,
     },
   },
-  {
-    id: "Mazapán",
-    name: "Mazapán",
-    categories: ["frappe", "milkTea"],
-    tier: "premium",
-    description: {
-      frappe: "Frappe dulce y cremoso con el sabor clásico del mazapán.",
-      milkTea: "Té con leche suave con esencia de mazapán.",
-    },
-  },
+  // {
+  //   id: "Mazapán",
+  //   name: "Mazapán",
+  //   categories: ["frappe", "milkTea"],
+  //   tier: "premium",
+  //   description: {
+  //     frappe: "Frappe dulce y cremoso con el sabor clásico del mazapán.",
+  //     milkTea: "Té con leche suave con esencia de mazapán.",
+  //   },
+  // },
   {
     id: "caramel-macchiato",
     name: "Caramel Macchiato",
@@ -397,18 +397,18 @@ export const flavors = [
       specialty: vainillaCookies,
     },
   },
-  {
-    id: "chocopeach",
-    name: "ChocoPeach",
-    description: {
-      specialty: "Frappe de chocolate blanco con durazno",
-    },
-    categories: ["specialty"],
-    tier: "premium",
-    // images: {
-    //   specialty: vainillaCookies,
-    // },
-  },
+  // {
+  //   id: "chocopeach",
+  //   name: "ChocoPeach",
+  //   description: {
+  //     specialty: "Frappe de chocolate blanco con durazno",
+  //   },
+  //   categories: ["specialty"],
+  //   tier: "premium",
+  //   // images: {
+  //   //   specialty: vainillaCookies,
+  //   // },
+  // },
   // {
   //   id: "pumpkinpie",
   //   name: "Pumpkin Pie",
@@ -423,7 +423,7 @@ export const flavors = [
 
 // Toppings
 export const toppings = {
-  poppingBoba: ["Mora", "Manzana verde", "Fresa", "Chicle", "Mango"],
+  poppingBoba: ["Mora", "Manzana verde", "Fresa", "Chicle"],
   jellys: ["Mix de frutas tropicales", "Jelly de Café"],
   // crystalBoba: ["Matcha"],
 };

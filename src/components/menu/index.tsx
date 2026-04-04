@@ -2,24 +2,30 @@
 import Image from "next/image";
 import logo from "@/assets/images/logo.png";
 
-import { Button } from "../ui/button";
 import { categories, Flavor, flavors, priceRules, SizeId } from "@/data/menu";
-import { Card, CardContent } from "../ui/card";
-
-import { Plus, ShoppingCart } from "lucide-react";
 import { useState } from "react";
 
 import BottomProduct from "./BottomProduct";
 import BottomCart from "./BottomCart";
-import frappeFresa from "@/assets/images/frappe-fresa.png";
-import { Badge } from "../ui/badge";
 
+/* ─── Brand tokens ─────────────────────────────────────── */
+const C = {
+  dark: "#CD576A", // deep forest green — header, primary buttons
+  olive: "#79874C", // olive green — secondary accents, counts
+  rose: "#CD576A", // rose — CTAs, active states
+  pink: "#F298AA", // blush pink — prices, soft highlights
+  cream: "#F8F5F1", // soft warm white — page background
+  white: "#FFFFFF",
+  text: "#2A2019", // warm near-black
+  muted: "#8A7A6E", // warm muted brown-gray
+  border: "rgba(59,89,53,0.1)",
+};
+
+/* ─── Interfaces ───────────────────────────────────────── */
 export interface Product {
   id: string;
   name: string;
   categories: string[];
-  // emoji: string
-  //   basePrice: number;
 }
 
 export interface CartItem {
@@ -28,7 +34,6 @@ export interface CartItem {
   name: string;
   flavor: string;
   size: string;
-  // iceLevel: string
   category: string;
   toppings: string[];
   price: number;
@@ -38,214 +43,508 @@ export interface CartItem {
 export interface Category {
   id: string;
   name: string;
-
-  // emoji: string
 }
 
+/* ─── Helpers ──────────────────────────────────────────── */
 export function getPrice(
   flavor: Flavor,
   sizeId: SizeId,
   category: string
 ): number | null {
-  // Si el sabor tiene precio personalizado
-  if (flavor.customPrice) {
-    return flavor.customPrice[sizeId];
-  }
-
-  if (category === "frappe") {
+  if (flavor.customPrice) return flavor.customPrice[sizeId];
+  if (category === "frappe")
     return priceRules[
       flavor.tier === "premium" ? "frappePremium" : "frappeClassic"
     ][sizeId];
-  }
-
-  if (
-    category === "tea" ||
-    category === "sodaItaliana" ||
-    category === "milkTea"
-  ) {
+  if (["tea", "sodaItaliana", "milkTea"].includes(category))
     return priceRules.tea[sizeId];
-  }
-
-  if (category === "specialty") {
-    return priceRules.specialty[sizeId];
-  }
-
+  if (category === "specialty") return priceRules.specialty[sizeId];
   return null;
 }
 
-const getImageForProduct = (product: Flavor, categoryId: string) => {
-  if (!product.images) return null;
-  const imageMap: { [key: string]: string } = product.images;
-  return imageMap[categoryId] || null;
+const getImage = (p: Flavor, cat: string) =>
+  p.images ? (p.images as Record<string, string>)[cat] ?? null : null;
+
+const getDesc = (p: Flavor, cat: string) =>
+  p.description ? (p.description as Record<string, string>)[cat] ?? null : null;
+
+const getMinPrice = (p: Flavor, cat: string): number => {
+  if (p.customPrice) return Math.min(...Object.values(p.customPrice));
+  if (cat === "sodaItaliana") return priceRules.sodaItaliana.mediano;
+  if (cat === "frappe")
+    return priceRules[p.tier === "premium" ? "frappePremium" : "frappeClassic"]
+      .mediano;
+  if (cat === "specialty") return priceRules.specialty.mediano;
+  return priceRules.tea.mediano;
 };
 
-const getDescriptionForProduct = (product: Flavor, categoryId: string) => {
-  if (!product.description) return null;
-  const descriptionMap: { [key: string]: string } = product.description;
-  return descriptionMap[categoryId] || null;
-};
+/* ─── Leaf decoration (SVG) ───────────────────────────── */
+const LeafIcon = ({
+  size = 20,
+  opacity = 0.18,
+}: {
+  size?: number;
+  opacity?: number;
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    style={{ opacity }}
+  >
+    <path
+      d="M12 2C7 2 3 6 3 11c0 3.5 2 6.5 5 8l4 3 4-3c3-1.5 5-4.5 5-8 0-5-4-9-9-9z"
+      fill="currentColor"
+    />
+  </svg>
+);
+
+/* ─── Placeholder ──────────────────────────────────────── */
+const Placeholder = ({ name }: { name: string }) => (
+  <div
+    style={{
+      width: 84,
+      height: 84,
+      borderRadius: 16,
+      flexShrink: 0,
+      backgroundColor: "rgba(59,89,53,0.07)",
+      border: `1px solid rgba(59,89,53,0.12)`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    }}
+  >
+    <span
+      style={{
+        fontSize: 26,
+        fontWeight: 700,
+        color: C.rose,
+        opacity: 0.6,
+        fontFamily: "var(--font-poppins)",
+      }}
+    >
+      {name.charAt(0).toUpperCase()}
+    </span>
+  </div>
+);
+
+/* ─── Menu ─────────────────────────────────────────────── */
 const Menu = () => {
   const [selectedCategory, setSelectedCategory] = useState<Category>({
     id: "frappe",
-    name: "frappe",
+    name: "Frappe",
   });
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
-  const cartTotal = cartItems.reduce(
-    (total, item) => total + item.price * item.quantity,
-    0
-  );
-  const cartItemCount = cartItems.reduce(
-    (count, item) => count + item.quantity,
-    0
-  );
+  const cartTotal = cartItems.reduce((t, i) => t + i.price * i.quantity, 0);
+  const cartItemCount = cartItems.reduce((c, i) => c + i.quantity, 0);
 
-  console.log(cartItems);
-  console.log(cartItemCount);
-
-  const handleProductClick = (product: Product) => {
-    setSelectedProduct(product);
+  const handleProductClick = (p: Product) => {
+    setSelectedProduct(p);
     setIsProductModalOpen(true);
   };
 
-  const handleAddToCart = (item: Omit<CartItem, "id">) => {
-    const newItem: CartItem = {
-      ...item,
-      id: Date.now().toString(),
-    };
-    setCartItems((prev) => [...prev, newItem]);
-    setIsProductModalOpen(false);
-  };
+  const handleAddToCart = (item: Omit<CartItem, "id">) =>
+    setCartItems((prev) => [...prev, { ...item, id: Date.now().toString() }]);
 
-  const handleRemoveFromCart = (itemId: string) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== itemId));
-  };
+  const handleRemoveFromCart = (id: string) =>
+    setCartItems((prev) => prev.filter((i) => i.id !== id));
 
-  const handleClearCart = () => {
-    setCartItems([]);
-  };
+  const handleClearCart = () => setCartItems([]);
+
+  const visible = flavors.filter((f) =>
+    f.categories.includes(selectedCategory.id)
+  );
 
   return (
-    <div className="bg-[#FFF7F9] min-h-screen">
-      <header className="sticky top-0 z-40 bg-main-dream">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <Image src={logo} className="w-32 h-full " alt="té sueño logo" />
-            </div>
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: C.cream,
+        fontFamily: "var(--font-poppins)",
+      }}
+    >
+      {/* ── Header ─────────────────────────────────── */}
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 40,
+          backgroundColor: C.dark,
+          boxShadow: "0 2px 12px rgba(0,0,0,0.18)",
+        }}
+      >
+        {/* Decorative leaf pattern at top */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            overflow: "hidden",
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{ position: "absolute", right: 12, top: -4, color: "white" }}
+          >
+            <LeafIcon size={52} opacity={0.07} />
+          </div>
+          <div
+            style={{ position: "absolute", right: 36, top: 4, color: "white" }}
+          >
+            <LeafIcon size={28} opacity={0.05} />
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: "12px 20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            position: "relative",
+          }}
+        >
+          <div>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 21,
+                fontWeight: 700,
+                color: "#FFFFFF",
+                letterSpacing: "-0.02em",
+                lineHeight: 1.1,
+              }}
+            >
+              Té Sueño
+            </p>
+            <p
+              style={{
+                margin: "3px 0 0",
+                fontSize: 10,
+                fontWeight: 400,
+                letterSpacing: "0.2em",
+                color: "rgba(255,255,255,0.55)",
+                textTransform: "uppercase",
+              }}
+            >
+              Bobba Tea
+            </p>
+          </div>
+
+          {/* Starbucks-style circular emblem */}
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              border: "1.5px solid rgba(255,255,255,0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "rgba(255,255,255,0.6)",
+            }}
+          >
+            <LeafIcon size={22} opacity={1} />
           </div>
         </div>
       </header>
 
-      <div className="sticky top-[70px] z-30  bg-main-dream rounded-b-[28px]">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex gap-2 overflow-x-auto">
-            {categories.map((category) => (
-              <Button
-                key={category.id}
-                variant={
-                  selectedCategory.id === category.id ? "default" : "outline"
-                }
-                // size="sm"
-                onClick={() => setSelectedCategory(category)}
-                className="flex flex-col items-center rounded-sm gap-1 whitespace-nowrap border h-auto border-main-dream hover:bg-main-dream/30 transition-all text-xs"
+      {/* ── Category tabs ───────────────────────────── */}
+      <div
+        style={{
+          position: "sticky",
+          top: 65,
+          zIndex: 30,
+          backgroundColor: C.dark,
+          boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+        }}
+      >
+        <div
+          className="scrollbar-hide"
+          style={{
+            display: "flex",
+            gap: 6,
+            overflowX: "auto",
+            padding: "10px 16px 14px",
+          }}
+        >
+          {categories.map((cat) => {
+            const active = selectedCategory.id === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat)}
+                style={{
+                  flexShrink: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "7px 14px",
+                  borderRadius: 100,
+                  border: active
+                    ? "1.5px solid transparent"
+                    : "1.5px solid rgba(255,255,255,0.18)",
+                  background: active ? "#FFFFFF" : "rgba(255,255,255,0.08)",
+                  color: active ? C.dark : "rgba(255,255,255,0.7)",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  fontFamily: "var(--font-poppins)",
+                }}
               >
                 <Image
-                  src={category.image}
-                  alt={category.name}
-                  className="w-5 h-5 object-cover"
+                  src={cat.image}
+                  alt={cat.name}
+                  width={16}
+                  height={16}
+                  style={{
+                    objectFit: "contain",
+                    filter: active
+                      ? `brightness(0) saturate(100%) invert(27%) sepia(20%) saturate(600%) hue-rotate(95deg)`
+                      : "brightness(0) invert(1)",
+                    opacity: active ? 1 : 0.7,
+                  }}
                 />
-
-                {category.name}
-              </Button>
-            ))}
-          </div>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: active ? 600 : 400,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {cat.name}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="px-4 py-5">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {flavors
-            .filter((flavor) => flavor.categories.includes(selectedCategory.id))
-            .map((product) => (
-              <div
-                className="flex gap-4 justify-between p-4 "
-                key={product.id}
-                onClick={() => handleProductClick(product)}
-              >
-                <div className="flex-1 flex flex-col gap-2 justify-between">
-                  <h3 className="text-xl font-medium tracking-widest mb-2">
-                    {product.name}
-                  </h3>
+      {/* ── Section heading ─────────────────────────── */}
+      <div style={{ padding: "24px 20px 8px", animation: "fadeIn 0.3s ease" }}>
+        <h2
+          style={{
+            margin: 0,
+            fontSize: 24,
+            fontWeight: 700,
+            color: C.dark,
+            letterSpacing: "-0.025em",
+          }}
+        >
+          {categories.find((c) => c.id === selectedCategory.id)?.name}
+        </h2>
+        <p
+          style={{
+            margin: "5px 0 0",
+            fontSize: 12,
+            color: C.muted,
+            fontWeight: 400,
+          }}
+        >
+          {visible.length} opciones disponibles
+        </p>
+      </div>
 
-                  {(() => {
-                    const description = getDescriptionForProduct(
-                      product as Flavor,
-                      selectedCategory.id
-                    );
+      {/* ── Product list ────────────────────────────── */}
+      <div
+        style={{
+          padding: "4px 16px",
+          paddingBottom: cartItemCount > 0 ? 108 : 48,
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+        }}
+      >
+        {visible.map((product, idx) => {
+          const imageSrc = getImage(product as Flavor, selectedCategory.id);
+          const description = getDesc(product as Flavor, selectedCategory.id);
+          const minPrice = getMinPrice(product as Flavor, selectedCategory.id);
 
-                    return description ? (
-                      <p className="text-sm text-muted-foreground mb-3 text-pretty">
-                        {description}
-                      </p>
-                    ) : null;
-                  })()}
-                  <Button
-                    // onClick={() => handleProductClick(product)}
-                    className="w-full h-6 rounded-sm bg-main-dream/80 text-sm uppercase font-bold "
+          return (
+            <div
+              key={product.id}
+              onClick={() => handleProductClick(product)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+                padding: 14,
+                backgroundColor: C.white,
+                borderRadius: 18,
+                boxShadow:
+                  "0 1px 6px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)",
+                cursor: "pointer",
+                opacity: 0,
+                animation: "fadeUp 0.38s ease forwards",
+                animationDelay: `${idx * 0.04}s`,
+                transition: "box-shadow 0.2s ease, transform 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget as HTMLDivElement;
+                el.style.boxShadow =
+                  "0 4px 20px rgba(0,0,0,0.1), 0 1px 6px rgba(0,0,0,0.06)";
+                el.style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget as HTMLDivElement;
+                el.style.boxShadow =
+                  "0 1px 6px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)";
+                el.style.transform = "translateY(0)";
+              }}
+            >
+              {/* Image left */}
+              {imageSrc ? (
+                <Image
+                  src={imageSrc}
+                  alt={product.name}
+                  width={84}
+                  height={84}
+                  quality={90}
+                  style={{
+                    borderRadius: 14,
+                    objectFit: "cover",
+                    flexShrink: 0,
+                  }}
+                />
+              ) : (
+                <Placeholder name={product.name} />
+              )}
+
+              {/* Text right */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h3
+                  style={{
+                    margin: "0 0 3px",
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: C.dark,
+                    letterSpacing: "-0.01em",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {product.name}
+                </h3>
+
+                {description && (
+                  <p
+                    style={{
+                      margin: "0 0 10px",
+                      fontSize: 12,
+                      fontWeight: 300,
+                      color: C.muted,
+                      lineHeight: 1.5,
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {description}
+                  </p>
+                )}
+
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: C.olive,
+                    }}
+                  >
+                    Desde ${minPrice}
+                  </span>
+
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      letterSpacing: "0.04em",
+                      color: "#FFFFFF",
+                      backgroundColor: C.rose,
+                      padding: "5px 13px",
+                      borderRadius: 100,
+                    }}
                   >
                     Ordenar
-                  </Button>
-                </div>
-                <div className="flex-1">
-                  {(() => {
-                    const imageSrc = getImageForProduct(
-                      product as Flavor,
-                      selectedCategory.id
-                    );
-                    return imageSrc ? (
-                      <Image
-                        src={imageSrc}
-                        className="w-40 h-full object-cover rounded-3xl"
-                        alt={product.name}
-                        quality={100}
-                      />
-                    ) : (
-                      <div className="h-40 w-40 bg-gray-200 rounded-3xl flex items-center justify-center">
-                        <span className="text-gray-500 text-sm">
-                          Sin imagen
-                        </span>
-                      </div>
-                    );
-                  })()}
+                  </span>
                 </div>
               </div>
-            ))}
-        </div>
+            </div>
+          );
+        })}
       </div>
 
+      {/* ── Cart bar ────────────────────────────────── */}
       {cartItemCount > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--main-dream)] text-white p-6 shadow-lg">
-          <div className="container mx-auto">
-            <Button
-              onClick={() => setIsCartModalOpen(true)}
-              className="w-full bg-white text-[var(--main-dream)] hover:bg-gray-100 flex items-center justify-between"
-            >
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="w-5 h-5" />
-                <span>
-                  {cartItemCount} Bebida{cartItemCount !== 1 ? "s" : ""}
-                </span>
+        <div
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 50,
+            padding: "12px 16px 28px",
+            backgroundColor: C.dark,
+            boxShadow: "0 -4px 24px rgba(0,0,0,0.16)",
+            animation: "fadeUp 0.28s ease",
+          }}
+        >
+          <button
+            onClick={() => setIsCartModalOpen(true)}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "14px 20px",
+              borderRadius: 16,
+              border: "none",
+              cursor: "pointer",
+              backgroundColor: C.rose,
+              color: "#FFFFFF",
+              fontFamily: "var(--font-poppins)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(255,255,255,0.2)",
+                  color: "#FFFFFF",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                {cartItemCount}
               </div>
-              <span className="font-semibold">${cartTotal.toFixed(2)}</span>
-            </Button>
-          </div>
+              <span style={{ fontWeight: 600, fontSize: 14 }}>
+                {cartItemCount} Bebida{cartItemCount !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <span style={{ fontWeight: 700, fontSize: 16 }}>
+              ${cartTotal.toFixed(2)}
+            </span>
+          </button>
         </div>
       )}
 
+      {/* ── Modals ──────────────────────────────────── */}
       {selectedProduct && (
         <BottomProduct
           product={selectedProduct}
@@ -266,4 +565,5 @@ const Menu = () => {
     </div>
   );
 };
+
 export default Menu;
