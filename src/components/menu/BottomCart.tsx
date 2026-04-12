@@ -1,9 +1,10 @@
-import { FC } from "react";
+import { FC, useState } from "react";
 import { CartItem } from ".";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../ui/drawer";
 import { MessageCircle, Trash2 } from "lucide-react";
 import { collection, addDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { normalizePhone } from "@/lib/loyalty";
 
 const C = {
   dark: "#CD576A", // deep forest green
@@ -57,6 +58,7 @@ const BottomCart: FC<BottomCartProps> = ({
   onRemoveItem,
   onClearCart,
 }) => {
+  const [loyaltyPhone, setLoyaltyPhone] = useState("");
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
   const generateWhatsAppMessage = () => {
@@ -76,7 +78,12 @@ const BottomCart: FC<BottomCartProps> = ({
         msg += `   • Toppings: ${item.toppings.join(", ")}\n`;
       msg += `   • Cantidad: ${item.quantity}\n\n`;
     });
-    msg += `Total: $${total.toFixed(2)}\n\n¡Gracias!`;
+    msg += `Total: $${total.toFixed(2)}`;
+    const normalized = normalizePhone(loyaltyPhone);
+    if (normalized.length >= 10) {
+      msg += `\n\n📱 Tarjeta de fidelidad: ${normalized}`;
+    }
+    msg += `\n\n¡Gracias!`;
     return encodeURIComponent(msg);
   };
 
@@ -292,12 +299,12 @@ const BottomCart: FC<BottomCartProps> = ({
                           transition: "color 0.15s ease",
                         }}
                         onMouseEnter={(e) =>
-                          ((e.currentTarget as HTMLButtonElement).style.color =
-                            "#e05555")
+                        ((e.currentTarget as HTMLButtonElement).style.color =
+                          "#e05555")
                         }
                         onMouseLeave={(e) =>
-                          ((e.currentTarget as HTMLButtonElement).style.color =
-                            "#ccc")
+                        ((e.currentTarget as HTMLButtonElement).style.color =
+                          "#ccc")
                         }
                       >
                         <Trash2 size={14} />
@@ -347,6 +354,59 @@ const BottomCart: FC<BottomCartProps> = ({
                     ${total.toFixed(2)}
                   </span>
                 </div>
+
+                {/* Loyalty phone */}
+                {/* <div
+                  style={{
+                    backgroundColor: "rgba(121,135,76,0.07)",
+                    borderRadius: 14,
+                    padding: "12px 14px",
+                    marginBottom: 12,
+                    border: "1px solid rgba(121,135,76,0.15)",
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: "0 0 8px",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: C.olive,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    🧋 Tarjeta de fidelidad
+                  </p>
+                  <input
+                    type="tel"
+                    placeholder="Tu número (opcional)"
+                    value={loyaltyPhone}
+                    onChange={(e) => setLoyaltyPhone(e.target.value)}
+                    style={{
+                      width: "100%",
+                      height: 40,
+                      borderRadius: 10,
+                      border: "1.5px solid rgba(121,135,76,0.2)",
+                      backgroundColor: C.white,
+                      padding: "0 12px",
+                      fontSize: 14,
+                      color: C.text,
+                      outline: "none",
+                      fontFamily: "var(--font-poppins)",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                  <p
+                    style={{
+                      margin: "6px 0 0",
+                      fontSize: 10.5,
+                      color: C.muted,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    Acumula pedidos y gana una bebida gratis
+                  </p>
+                </div> */}
 
                 <button
                   onClick={handleWhatsAppOrder}
