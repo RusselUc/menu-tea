@@ -494,7 +494,7 @@ function AdminPanel() {
             </button>
           )}
 
-          {stamped && (
+          {canStamp && (
             <button
               onClick={sendWhatsAppLink}
               style={{
