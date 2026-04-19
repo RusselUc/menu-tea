@@ -29,6 +29,8 @@ const FLOWER_POSITIONS = [
   { cx: 50,  cy: 97  }, // left mid
   { cx: 100, cy: 88  }, // center mid
   { cx: 150, cy: 97  }, // right mid
+  { cx: 42,  cy: 130 }, // lower left
+  { cx: 158, cy: 130 }, // lower right
 ];
 
 // Bezier stem paths from wrap (~y=178) to each flower tip
@@ -41,6 +43,8 @@ const STEM_PATHS = [
   "M 93 178 C 77 158 62 133 50 97",
   "M 100 176 C 100 148 100 120 100 88",
   "M 107 178 C 123 158 138 133 150 97",
+  "M 91 178 C 74 168 58 155 42 130",
+  "M 109 178 C 126 168 142 155 158 130",
 ];
 
 function SingleFlower({ bloomed, delay }: { bloomed: boolean; delay: number }) {
@@ -300,16 +304,25 @@ function CardView({ card, phone }: { card: LoyaltyCard; phone: string }) {
                 ¡Tienes {card.freedrinks} bebida
                 {card.freedrinks !== 1 ? "s" : ""} gratis!
               </p>
-              <p
+              <a
+                href={`https://wa.me/529969634631?text=${encodeURIComponent(`¡Hola! Quiero canjear mi bebida gratis 🌸 Mi tarjeta está a nombre del número ${normalizePhone(phone)}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
-                  margin: "4px 0 0",
-                  fontSize: 12,
-                  color: C.muted,
-                  fontWeight: 400,
+                  display: "inline-block",
+                  marginTop: 12,
+                  padding: "10px 20px",
+                  backgroundColor: "#25D366",
+                  color: C.white,
+                  borderRadius: 12,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  fontFamily: "var(--font-poppins)",
                 }}
               >
-                Mencionalo en tu próximo pedido
-              </p>
+                Canjear por WhatsApp
+              </a>
             </>
           ) : (
             <p
@@ -327,68 +340,6 @@ function CardView({ card, phone }: { card: LoyaltyCard; phone: string }) {
               para tu bebida gratis
             </p>
           )}
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 360,
-          display: "flex",
-          gap: 10,
-          marginBottom: 14,
-        }}
-      >
-        <div
-          style={{
-            flex: 1,
-            backgroundColor: C.white,
-            borderRadius: 16,
-            padding: "14px 12px",
-            textAlign: "center",
-            boxShadow: "0 1px 6px rgba(0,0,0,0.05)",
-          }}
-        >
-          <p
-            style={{
-              margin: 0,
-              fontSize: 24,
-              fontWeight: 700,
-              color: C.dark,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            {card.totalOrders}
-          </p>
-          <p style={{ margin: "3px 0 0", fontSize: 11, color: C.muted }}>
-            Pedidos totales
-          </p>
-        </div>
-        <div
-          style={{
-            flex: 1,
-            backgroundColor: C.white,
-            borderRadius: 16,
-            padding: "14px 12px",
-            textAlign: "center",
-            boxShadow: "0 1px 6px rgba(0,0,0,0.05)",
-          }}
-        >
-          <p
-            style={{
-              margin: 0,
-              fontSize: 24,
-              fontWeight: 700,
-              color: C.olive,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            {card.freedrinks}
-          </p>
-          <p style={{ margin: "3px 0 0", fontSize: 11, color: C.muted }}>
-            Bebidas gratis
-          </p>
         </div>
       </div>
 

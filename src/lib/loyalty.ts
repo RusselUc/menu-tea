@@ -7,7 +7,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-export const STAMPS_FOR_FREE = 8;
+export const STAMPS_FOR_FREE = 10;
 
 export interface LoyaltyCard {
   phone: string;
