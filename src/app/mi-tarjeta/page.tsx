@@ -343,6 +343,22 @@ function CardView({ card, phone }: { card: LoyaltyCard; phone: string }) {
         </div>
       </div>
 
+      {/* Terms note */}
+      <p
+        style={{
+          width: "100%",
+          maxWidth: 360,
+          margin: "0 0 10px",
+          fontSize: 11,
+          color: C.muted,
+          textAlign: "center",
+          lineHeight: 1.6,
+        }}
+      >
+        Aplica en vasos mediano y grande.{" "}
+        Vasos Pandi y bebidas especiales no entran en la promoción.
+      </p>
+
       {/* Copy link */}
       <button
         onClick={copyLink}
