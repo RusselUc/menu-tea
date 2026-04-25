@@ -1,9 +1,9 @@
 "use client";
 import Image from "next/image";
-import logo from "@/assets/images/logo.png";
 
 import { categories, Flavor, flavors, priceRules, SizeId } from "@/data/menu";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getMenuItems, getPriceRules, PriceRules, DEFAULT_PRICE_RULES, MenuItem } from "@/lib/menu-items";
 
 import BottomProduct from "./BottomProduct";
 import BottomCart from "./BottomCart";
@@ -49,16 +49,15 @@ export interface Category {
 export function getPrice(
   flavor: Flavor,
   sizeId: SizeId,
-  category: string
+  category: string,
+  rules: typeof priceRules = priceRules
 ): number | null {
   if (flavor.customPrice) return flavor.customPrice[sizeId];
   if (category === "frappe")
-    return priceRules[
-      flavor.tier === "premium" ? "frappePremium" : "frappeClassic"
-    ][sizeId];
+    return rules[flavor.tier === "premium" ? "frappePremium" : "frappeClassic"][sizeId];
   if (["tea", "sodaItaliana", "milkTea"].includes(category))
-    return priceRules.tea[sizeId];
-  if (category === "specialty") return priceRules.specialty[sizeId];
+    return rules.tea[sizeId];
+  if (category === "specialty") return rules.specialty[sizeId];
   return null;
 }
 
@@ -68,15 +67,14 @@ const getImage = (p: Flavor, cat: string) =>
 const getDesc = (p: Flavor, cat: string) =>
   p.description ? (p.description as Record<string, string>)[cat] ?? null : null;
 
-const getMinPrice = (p: Flavor, cat: string): number => {
+function getMinPrice(p: Flavor, cat: string, rules: typeof priceRules = priceRules): number {
   if (p.customPrice) return Math.min(...Object.values(p.customPrice));
-  if (cat === "sodaItaliana") return priceRules.sodaItaliana.mediano;
+  if (cat === "sodaItaliana") return rules.sodaItaliana.mediano;
   if (cat === "frappe")
-    return priceRules[p.tier === "premium" ? "frappePremium" : "frappeClassic"]
-      .mediano;
-  if (cat === "specialty") return priceRules.specialty.mediano;
-  return priceRules.tea.mediano;
-};
+    return rules[p.tier === "premium" ? "frappePremium" : "frappeClassic"].mediano;
+  if (cat === "specialty") return rules.specialty.mediano;
+  return rules.tea.mediano;
+}
 
 /* ─── Leaf decoration (SVG) ───────────────────────────── */
 const LeafIcon = ({
@@ -129,6 +127,24 @@ const Placeholder = ({ name }: { name: string }) => (
   </div>
 );
 
+/* ─── Helpers to map Firestore items → Flavor ─────────── */
+function menuItemToFlavor(item: MenuItem): Flavor {
+  const staticFlavor = flavors.find((f) => f.id === item.id);
+  const images = (item.imageUrls && Object.keys(item.imageUrls).length > 0)
+    ? item.imageUrls
+    : (staticFlavor?.images ?? {});
+
+  return {
+    id: item.id,
+    name: item.name,
+    categories: item.categories,
+    tier: item.tier,
+    customPrice: item.customPrice,
+    images,
+    description: item.descriptions,
+  } as Flavor;
+}
+
 /* ─── Menu ─────────────────────────────────────────────── */
 const Menu = () => {
   const [selectedCategory, setSelectedCategory] = useState<Category>({
@@ -139,6 +155,23 @@ const Menu = () => {
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [firestoreFlavors, setFirestoreFlavors] = useState<Flavor[] | null>(null);
+  const [firestorePrices, setFirestorePrices] = useState<PriceRules>(DEFAULT_PRICE_RULES);
+  const [menuLoading, setMenuLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([getMenuItems(), getPriceRules()])
+      .then(([items, prices]) => {
+        if (items.length > 0) {
+          setFirestoreFlavors(items.filter((i) => i.active).map(menuItemToFlavor));
+        }
+        setFirestorePrices(prices);
+      })
+      .catch(() => { /* silently fall back to static */ })
+      .finally(() => setMenuLoading(false));
+  }, []);
+
+  const activeFlavors = firestoreFlavors ?? flavors;
 
   const cartTotal = cartItems.reduce((t, i) => t + i.price * i.quantity, 0);
   const cartItemCount = cartItems.reduce((c, i) => c + i.quantity, 0);
@@ -156,7 +189,7 @@ const Menu = () => {
 
   const handleClearCart = () => setCartItems([]);
 
-  const visible = flavors.filter((f) =>
+  const visible = activeFlavors.filter((f) =>
     f.categories.includes(selectedCategory.id)
   );
 
@@ -344,7 +377,7 @@ const Menu = () => {
             fontWeight: 400,
           }}
         >
-          {visible.length} opciones disponibles
+          {menuLoading ? "Cargando..." : `${visible.length} opciones disponibles`}
         </p>
       </div>
 
@@ -358,10 +391,61 @@ const Menu = () => {
           gap: 10,
         }}
       >
-        {visible.map((product, idx) => {
+        {menuLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+                padding: 14,
+                backgroundColor: C.white,
+                borderRadius: 18,
+                boxShadow: "0 1px 6px rgba(0,0,0,0.06)",
+              }}
+            >
+              <div style={{
+                width: 84,
+                height: 84,
+                borderRadius: 14,
+                background: `linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.03) 50%, rgba(0,0,0,0.06) 75%)`,
+                backgroundSize: "200% 100%",
+                animation: "shimmer 1.4s infinite",
+                flexShrink: 0,
+              }} />
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{
+                  height: 14,
+                  borderRadius: 6,
+                  width: "55%",
+                  background: `linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.03) 50%, rgba(0,0,0,0.06) 75%)`,
+                  backgroundSize: "200% 100%",
+                  animation: `shimmer 1.4s ${i * 0.1}s infinite`,
+                }} />
+                <div style={{
+                  height: 11,
+                  borderRadius: 6,
+                  width: "80%",
+                  background: `linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.03) 50%, rgba(0,0,0,0.06) 75%)`,
+                  backgroundSize: "200% 100%",
+                  animation: `shimmer 1.4s ${i * 0.1 + 0.1}s infinite`,
+                }} />
+                <div style={{
+                  height: 11,
+                  borderRadius: 6,
+                  width: "40%",
+                  background: `linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.03) 50%, rgba(0,0,0,0.06) 75%)`,
+                  backgroundSize: "200% 100%",
+                  animation: `shimmer 1.4s ${i * 0.1 + 0.2}s infinite`,
+                }} />
+              </div>
+            </div>
+          ))
+        ) : visible.map((product, idx) => {
           const imageSrc = getImage(product as Flavor, selectedCategory.id);
           const description = getDesc(product as Flavor, selectedCategory.id);
-          const minPrice = getMinPrice(product as Flavor, selectedCategory.id);
+          const minPrice = getMinPrice(product as Flavor, selectedCategory.id, firestorePrices);
 
           return (
             <div
@@ -485,6 +569,14 @@ const Menu = () => {
         })}
       </div>
 
+      {/* ── Shimmer keyframe ────────────────────────── */}
+      <style>{`
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
+
       {/* ── Cart bar ────────────────────────────────── */}
       {cartItemCount > 0 && (
         <div
@@ -551,6 +643,7 @@ const Menu = () => {
           isOpen={isProductModalOpen}
           onClose={() => setIsProductModalOpen(false)}
           category={selectedCategory}
+          priceRules={firestorePrices}
           onAddToCart={handleAddToCart}
         />
       )}

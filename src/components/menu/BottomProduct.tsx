@@ -1,7 +1,7 @@
 import { FC, useState } from "react";
 import { CartItem, Category, getPrice, Product } from ".";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../ui/drawer";
-import { Flavor, SizeId, sizes, toppings } from "@/data/menu";
+import { Flavor, SizeId, sizes, toppings, priceRules as staticPriceRules } from "@/data/menu";
 import { Minus, Plus } from "lucide-react";
 
 const C = {
@@ -22,6 +22,7 @@ interface BottomProductProps {
   product: Product;
   category: Category;
   onAddToCart: (item: Omit<CartItem, "id">) => void;
+  priceRules?: typeof staticPriceRules;
 }
 
 const SectionLabel = ({ children }: { children: React.ReactNode }) => (
@@ -46,6 +47,7 @@ const BottomProduct: FC<BottomProductProps> = ({
   product,
   category,
   onAddToCart,
+  priceRules = staticPriceRules,
 }) => {
   const [selectedSize, setSelectedSize] = useState<SizeId>("mediano");
   const [quantity, setQuantity] = useState(1);
@@ -63,7 +65,7 @@ const BottomProduct: FC<BottomProductProps> = ({
   };
 
   const getBasePrice = () =>
-    getPrice(product as unknown as Flavor, selectedSize, category.id) ?? 0;
+    getPrice(product as unknown as Flavor, selectedSize, category.id, priceRules) ?? 0;
 
   const getPriceWithToppings = () => {
     const base = getBasePrice();
@@ -164,7 +166,8 @@ const BottomProduct: FC<BottomProductProps> = ({
                   getPrice(
                     product as unknown as Flavor,
                     size.id as SizeId,
-                    category.id
+                    category.id,
+                    priceRules
                   ) ?? size.price;
                 return (
                   <button
