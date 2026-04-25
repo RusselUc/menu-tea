@@ -516,8 +516,8 @@ export default function MenuPage() {
                         <p style={{ margin: "0 0 6px", fontSize: 12, color: T.secondary, fontWeight: 500 }}>
                           {CATEGORY_LABELS[cat] ?? cat}
                         </p>
+                        <label htmlFor={`img-input-${cat}`} style={{ cursor: "pointer", display: "block" }}>
                         <div
-                          onClick={() => fileRef.current?.click() || (fileRef.current?.setAttribute("data-cat", cat), fileRef.current?.click())}
                           style={{
                             border: `2px dashed ${T.border}`, borderRadius: 10,
                             padding: preview ? 0 : "16px",
@@ -535,12 +535,12 @@ export default function MenuPage() {
                             </p>
                           )}
                         </div>
+                        </label>
                         <input
                           type="file"
                           accept="image/*"
                           hidden
                           onChange={(e) => handleImageChange(cat, e)}
-                          ref={(el) => { if (el) el.id = `img-input-${cat}`; }}
                           id={`img-input-${cat}`}
                         />
                         <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
