@@ -462,7 +462,7 @@ export default function MiTarjetaPage() {
           }}
         >
           Por cada pedido, una flor —{" "}
-          <strong style={{ color: C.dark }}>8 flores = bebida gratis</strong>
+          <strong style={{ color: C.dark }}>10 flores = bebida gratis</strong>
         </p>
       </div>
 
