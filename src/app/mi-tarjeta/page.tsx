@@ -505,7 +505,7 @@ export default function MiTarjetaPage() {
           >
             No encontramos tu tarjeta.{" "}
             <strong style={{ color: C.dark }}>
-              Incluye tu número en tu próximo pedido
+              Haz tu primer pedido
             </strong>{" "}
             para empezar a acumular.
           </p>
