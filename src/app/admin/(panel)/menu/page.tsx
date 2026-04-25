@@ -739,10 +739,10 @@ function ItemRow({
       transition: "opacity 0.2s",
     }}>
       {/* Image */}
-      {item.imageUrl ? (
+      {item.imageUrls && Object.values(item.imageUrls)[0] ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={item.imageUrl}
+          src={Object.values(item.imageUrls)[0]}
           alt={item.name}
           style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover", flexShrink: 0 }}
         />
