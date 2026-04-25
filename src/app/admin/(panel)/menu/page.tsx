@@ -79,7 +79,6 @@ export default function MenuPage() {
   const [imagePreviews, setImagePreviews] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
-  const [seedDone, setSeedDone] = useState(false);
   const [toast, setToast] = useState<string>("");
   const [confirmDelete, setConfirmDelete] = useState<MenuItem | null>(null);
   const [priceRules, setPriceRules] = useState<PriceRules>(DEFAULT_PRICE_RULES);
@@ -112,7 +111,6 @@ export default function MenuPage() {
     try {
       const n = await seedMenuFromStatic();
       await load();
-      setSeedDone(true);
       showToast(n > 0 ? `${n} productos importados` : "Menú ya estaba inicializado");
     } finally {
       setSeeding(false);
@@ -135,7 +133,7 @@ export default function MenuPage() {
       categories: item.categories,
       tier: item.tier,
       customPrice: item.customPrice,
-      imageUrl: item.imageUrl,
+      imageUrls: item.imageUrls ?? {},
       descriptions: { ...item.descriptions },
       active: item.active,
     });

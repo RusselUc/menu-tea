@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import pumpkin from "@/assets/images/specialty/pumpkin.png";
 import chocoberry from "@/assets/images/specialty/chocoberry.png";
 import vainillaCookies from "@/assets/images/specialty/vainilla-cookie.png";

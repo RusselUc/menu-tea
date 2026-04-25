@@ -39,7 +39,7 @@ const BottomCart: FC<BottomCartProps> = ({
   onRemoveItem,
   onClearCart,
 }) => {
-  const [loyaltyPhone, setLoyaltyPhone] = useState("");
+  const [loyaltyPhone, setLoyaltyPhone] = useState(""); // eslint-disable-line @typescript-eslint/no-unused-vars
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
   const generateWhatsAppMessage = () => {
