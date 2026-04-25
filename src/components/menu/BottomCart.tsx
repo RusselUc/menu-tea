@@ -2,8 +2,7 @@ import { FC, useState } from "react";
 import { CartItem } from ".";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../ui/drawer";
 import { MessageCircle, Trash2 } from "lucide-react";
-import { collection, addDoc, Timestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { saveFullOrder } from "@/lib/orders";
 import { normalizePhone } from "@/lib/loyalty";
 
 const C = {
@@ -26,24 +25,6 @@ interface BottomCartProps {
   onClearCart: () => void;
 }
 
-export async function saveOrder(order: {
-  flavor: string;
-  size: "mediano" | "grande" | "pandi";
-  category: string;
-  toppings: string[];
-  price: number;
-  quantity: number;
-}) {
-  try {
-    await addDoc(collection(db, "orders"), {
-      ...order,
-      timestamp: Timestamp.now(),
-      status: "success",
-    });
-  } catch (error) {
-    console.error("Error al guardar pedido:", error);
-  }
-}
 
 const SIZE_LABELS: Record<string, string> = {
   mediano: "Mediano · 16oz",
@@ -64,14 +45,6 @@ const BottomCart: FC<BottomCartProps> = ({
   const generateWhatsAppMessage = () => {
     let msg = `¡Hola! Me gustaría hacer un pedido en Té Sueño:\n\n`;
     items.forEach((item) => {
-      saveOrder({
-        flavor: item.name,
-        size: item.size as "mediano" | "grande" | "pandi",
-        category: item.category,
-        toppings: item.toppings,
-        price: item.price,
-        quantity: item.quantity,
-      });
       msg += `${item.category} — ${item.name}\n`;
       msg += `   • ${SIZE_LABELS[item.size] ?? item.size}\n`;
       if (item.toppings.length > 0)
@@ -88,6 +61,20 @@ const BottomCart: FC<BottomCartProps> = ({
   };
 
   const handleWhatsAppOrder = () => {
+    const normalized = normalizePhone(loyaltyPhone);
+    saveFullOrder({
+      items: items.map((item) => ({
+        flavor: item.name,
+        size: item.size,
+        category: item.category,
+        toppings: item.toppings,
+        price: item.price,
+        quantity: item.quantity,
+      })),
+      total,
+      ...(normalized.length >= 10 ? { phone: normalized } : {}),
+    }).catch(console.error);
+
     window.open(
       `https://wa.me/529969634631?text=${generateWhatsAppMessage()}`,
       "_blank"
