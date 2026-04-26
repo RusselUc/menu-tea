@@ -217,7 +217,7 @@ const Menu = () => {
   const handleClearCart = () => setCartItems([]);
 
   function handleSurprise() {
-    setRandomDraw(pickRandom(activeFlavors, categories, firestoreToppings));
+    setRandomDraw(pickRandom(activeFlavors as Flavor[], categories, firestoreToppings));
   }
 
   const visible = activeFlavors.filter((f) =>
@@ -851,12 +851,12 @@ function SurpriseDrawer({
             </p>
             <div style={{ display: "flex", gap: 8 }}>
               {sizes.map((s) => {
-                const sizePrice = getPrice(flavor, s.id, category.id, firestorePrices) ?? 0;
+                const sizePrice = getPrice(flavor, s.id as SizeId, category.id, firestorePrices) ?? 0;
                 const active = selectedSize === s.id;
                 return (
                   <button
                     key={s.id}
-                    onClick={() => setSelectedSize(s.id)}
+                    onClick={() => setSelectedSize(s.id as SizeId)}
                     style={{
                       flex: 1, padding: "10px 6px", borderRadius: 12,
                       border: active ? `2px solid ${C.rose}` : `1.5px solid ${C.border}`,

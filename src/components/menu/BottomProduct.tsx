@@ -1,7 +1,7 @@
 import { FC, useState } from "react";
 import { CartItem, Category, getPrice, Product } from ".";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../ui/drawer";
-import { Flavor, SizeId, sizes, toppings as staticToppings, priceRules as staticPriceRules } from "@/data/menu";
+import { Flavor, SizeId, sizes, priceRules as staticPriceRules } from "@/data/menu";
 import { ToppingGroup, ToppingItem, DEFAULT_TOPPINGS } from "@/lib/menu-items";
 import { Minus, Plus } from "lucide-react";
 
