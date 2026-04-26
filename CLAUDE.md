@@ -12,7 +12,8 @@ Menu interactivo para **Té Sueño**, una tienda de bubble tea. Los clientes pue
 
 - **Next.js 15** + **React 19** + **TypeScript 5**
 - **Tailwind CSS 4** (con PostCSS)
-- **Firebase 12** (Firestore) — persistencia de sesiones de delivery
+- **Firebase 12** (Firestore) — menu, precios, toppings, sesiones, ordenes, fidelidad
+- **Supabase Storage** — imagenes de productos (bucket `menu`, ruta `{itemId}/{category}.{ext}`)
 - **Leaflet / react-leaflet** — mapa en la pantalla de entrega
 - **Radix UI** (checkbox, dialog, label, slot) + **Vaul** (drawer/modal con animaciones)
 - **Lucide React** — iconos
@@ -30,28 +31,36 @@ npm run lint     # ESLint
 ```
 src/
 ├── app/
-│   ├── page.tsx                      # Pagina principal (render del menu)
-│   ├── delivery/page.tsx             # Pantalla de entrega con mapa
-│   ├── share/[sessionId]/page.tsx    # Orden compartida por sesion
+│   ├── page.tsx                          # Pagina principal (render del menu)
+│   ├── delivery/page.tsx                 # Pantalla de entrega con mapa
+│   ├── share/[sessionId]/page.tsx        # Orden compartida por sesion
 │   ├── admin/
-│   │   ├── page.tsx                  # Panel admin con PIN + gestion de tarjetas de fidelidad
-│   │   └── actions.ts                # Server action: validateAdminPin()
-│   ├── mi-tarjeta/page.tsx           # Vista publica de tarjeta de fidelidad por telefono
+│   │   ├── page.tsx                      # Login admin (PIN)
+│   │   ├── actions.ts                    # Server action: validateAdminPin()
+│   │   └── (panel)/
+│   │       ├── layout.tsx                # Layout del panel (requiere sesion)
+│   │       ├── menu/page.tsx             # Gestion de productos, precios y toppings
+│   │       └── loyalty/page.tsx          # Gestion de tarjetas de fidelidad
+│   ├── api/
+│   │   └── upload-menu-image/route.ts    # API route: sube imagenes a Supabase con service role
+│   ├── mi-tarjeta/page.tsx               # Vista publica de tarjeta de fidelidad por telefono
 │   └── layout.tsx
 ├── components/
 │   ├── menu/
-│   │   ├── index.tsx                 # Componente principal del menu
-│   │   ├── BottomProduct.tsx         # Modal de detalle/personalizacion de producto
-│   │   └── BottomCart.tsx            # Modal del carrito + guardado de orden en Firestore
-│   ├── delivery/index.tsx            # Vista de delivery con mapa Leaflet
-│   ├── share-location/index.tsx      # Componente para compartir ubicacion
-│   └── ui/                           # Componentes reutilizables (button, card, badge, etc.)
+│   │   ├── index.tsx                     # Componente principal del menu (carga desde Firestore)
+│   │   ├── BottomProduct.tsx             # Modal de detalle/personalizacion de producto
+│   │   └── BottomCart.tsx                # Modal del carrito + guardado de orden en Firestore
+│   ├── delivery/index.tsx                # Vista de delivery con mapa Leaflet
+│   ├── share-location/index.tsx          # Componente para compartir ubicacion
+│   └── ui/                               # Componentes reutilizables (button, card, badge, etc.)
 ├── data/
-│   └── menu.ts                       # Toda la data del menu (sabores, categorias, precios, toppings)
+│   └── menu.ts                           # Data estatica de respaldo (sabores, categorias, precios)
 └── lib/
-    ├── firebase.ts                   # Config de Firebase (usa variables de entorno)
-    ├── loyalty.ts                    # Operaciones Firestore para tarjetas de fidelidad
-    └── utils.ts                      # Utilidades (cn, etc.)
+    ├── firebase.ts                       # Config de Firebase — solo exporta `db` (Firestore)
+    ├── supabase.ts                       # Cliente Supabase + uploadMenuImageSupabase()
+    ├── menu-items.ts                     # CRUD Firestore: menu_items, price_rules, toppings
+    ├── loyalty.ts                        # Operaciones Firestore para tarjetas de fidelidad
+    └── utils.ts                          # Utilidades (cn, etc.)
 ```
 
 ## Data del menu (`src/data/menu.ts`)
@@ -102,6 +111,9 @@ precio_final = precio_base + max(0, selectedToppings.length - 1) * 10
 
 ### Agregar un nuevo sabor
 
+**Desde el admin (recomendado):** `/admin` → Menu → "Nuevo producto". No requiere tocar codigo.
+
+**Desde codigo (fallback estatico):**
 1. Agregar la imagen en `src/assets/images/<categoria>/`
 2. Importar la imagen en `src/data/menu.ts`
 3. Agregar el objeto al array `flavors` con: `id`, `name`, `categories`, `tier` y opcionalmente `images`, `description`, `customPrice`
@@ -162,19 +174,72 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID=
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
+NEXT_PUBLIC_SUPABASE_URL=               # URL del proyecto Supabase
+NEXT_PUBLIC_SUPABASE_ANON_KEY=          # Clave publica Supabase
+SUPABASE_SERVICE_ROLE_KEY=              # Clave privada (solo servidor) — usada en la API route de upload
 ```
 
 ## Firebase
 
-Tres colecciones en Firestore:
+Colecciones en Firestore:
 
-| Coleccion       | Descripcion                                         |
-|-----------------|-----------------------------------------------------|
-| `sessions`      | Sesiones de delivery en vivo (lat/long/timestamp)   |
-| `orders`        | Ordenes guardadas al hacer pedido por WhatsApp      |
-| `loyalty_cards` | Tarjetas de fidelidad indexadas por telefono        |
+| Coleccion       | Descripcion                                                        |
+|-----------------|--------------------------------------------------------------------|
+| `menu_items`    | Productos del menu (nombre, categorias, tier, precios, imagenes)   |
+| `settings`      | Config global: `price_rules` y `toppings`                          |
+| `sessions`      | Sesiones de delivery en vivo (lat/long/timestamp)                  |
+| `orders`        | Ordenes guardadas al hacer pedido por WhatsApp                     |
+| `loyalty_cards` | Tarjetas de fidelidad indexadas por telefono                       |
 
 La config se lee desde variables de entorno `NEXT_PUBLIC_FIREBASE_*`. Ver `src/lib/firebase.ts`.
+
+### Fuente de datos del menu publico
+
+El menu carga primero desde Firestore (`menu_items`). Si la coleccion esta vacia o falla, cae silenciosamente al array estatico `flavors` en `src/data/menu.ts`. Durante la carga muestra un skeleton animado.
+
+### Imagenes de productos
+
+Se almacenan en **Supabase Storage** (bucket `menu`). Cada producto puede tener una imagen distinta por categoria: ruta `{itemId}/{category}.{ext}`. La subida se hace via API route `/api/upload-menu-image` usando el service role key (evita RLS).
+
+### Schema `menu_items/{id}`
+
+```ts
+interface MenuItem {
+  id: string;
+  name: string;
+  categories: string[];
+  tier: "classic" | "premium";
+  customPrice?: { mediano: number; grande: number; pandi: number };
+  imageUrls?: Record<string, string>;   // categoryId -> URL de Supabase
+  descriptions: Record<string, string>; // categoryId -> descripcion
+  active: boolean;
+  createdAt: number;
+  order: number;
+}
+```
+
+### Schema `settings/price_rules`
+
+```ts
+interface PriceRules {
+  frappeClassic:  { mediano: number; grande: number; pandi: number };
+  frappePremium:  { mediano: number; grande: number; pandi: number };
+  tea:            { mediano: number; grande: number; pandi: number };
+  sodaItaliana:   { mediano: number; grande: number; pandi: number };
+  specialty:      { mediano: number; grande: number; pandi: number };
+}
+```
+
+### Schema `settings/toppings`
+
+```ts
+interface ToppingGroup {
+  id: string;
+  label: string;
+  items: { name: string; active: boolean }[];
+}
+// guardado como: { groups: ToppingGroup[] }
+```
 
 ## Flujo de pedido (WhatsApp)
 
@@ -209,15 +274,38 @@ interface LoyaltyCard {
 
 Protegido por PIN via server action (`actions.ts` → `validateAdminPin()`). El `ADMIN_PIN` vive en el servidor y nunca se expone al cliente.
 
-Funcionalidades:
+### `/admin/(panel)/menu` — Gestion de menu
+
+- Listar, buscar y filtrar productos por categoria
+- Activar/desactivar productos (toggle)
+- Crear y editar productos: nombre, categorias, tier, precio custom, descripcion por categoria, imagen por categoria
+- Eliminar productos
+- **Precios**: editar las reglas de precio por tier/tamano (`settings/price_rules`)
+- **Toppings**: editar grupos y items, activar/desactivar por topping (`settings/toppings`)
+- Boton "Importar del codigo" para hacer seed inicial desde `menu.ts` (solo si la coleccion esta vacia)
+
+### `/admin/(panel)/loyalty` — Tarjetas de fidelidad
+
 - Buscar tarjeta por telefono
 - Agregar sello
 - Canjear bebida gratis
 - Generar link de WhatsApp para enviarle la tarjeta al cliente
 
+## Feature: Sorpréndeme
+
+Boton en el menu publico que abre un bottom sheet con una bebida aleatoria pre-armada.
+
+**Reglas:** siempre 1 sabor aleatorio + 1 topping aleatorio (gratis) + el usuario elige el tamano.
+
+**Implementacion** (`src/components/menu/index.tsx`):
+- `pickRandom(activeFlavors, categories, toppingGroups)` — elige categoria aleatoria → sabor en esa categoria → 1 topping activo
+- `SurpriseDrawer` — bottom sheet que muestra la tarjeta del producto con imagen hero + chips de categoria y topping superpuestos, selector de tamano y botones "Agregar al carrito" / "Otra opcion"
+- El precio es el precio base del tamano elegido (1 topping siempre gratis)
+
 ## Notas de desarrollo
 
-- Los sabores comentados en `menu.ts` son los que estan **temporalmente deshabilitados** (Durazno, Mango, Taro, etc.) — no eliminar, solo comentar/descomentar para activarlos.
+- Los sabores comentados en `menu.ts` son los que estan **temporalmente deshabilitados** (Durazno, Mango, Taro, etc.) — no eliminar, solo comentar/descomentar para activarlos. La fuente de verdad en produccion es Firestore.
 - La categoria `milkTea` existe en los datos pero esta comentada en el array `categories` — los sabores con esa categoria siguen en el array `flavors`.
 - El carrito muestra una barra fija en el footer solo cuando `cartItemCount > 0`.
-- Las imagenes de productos son `PNG`/`JPEG` en `src/assets/images/` organizadas por categoria.
+- Las imagenes de productos se sirven desde Supabase Storage. Las imagenes estaticas en `src/assets/images/` solo se usan como fallback cuando un item de Firestore no tiene `imageUrls`.
+- `next.config.ts` incluye `*.supabase.co` en `images.remotePatterns` para permitir `next/image` con URLs de Supabase.
