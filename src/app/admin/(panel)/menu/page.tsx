@@ -13,6 +13,10 @@ import {
   PriceRules,
   DEFAULT_PRICE_RULES,
   PRICE_RULE_LABELS,
+  getToppings,
+  saveToppings,
+  ToppingGroup,
+  DEFAULT_TOPPINGS,
   CATEGORY_LABELS,
   ALL_CATEGORIES,
 } from "@/lib/menu-items";
@@ -85,10 +89,15 @@ export default function MenuPage() {
   const [pricesDraft, setPricesDraft] = useState<PriceRules>(DEFAULT_PRICE_RULES);
   const [showPrices, setShowPrices] = useState(false);
   const [savingPrices, setSavingPrices] = useState(false);
+  const [toppingGroups, setToppingGroups] = useState<ToppingGroup[]>(DEFAULT_TOPPINGS);
+  const [toppingsDraft, setToppingsDraft] = useState<ToppingGroup[]>(DEFAULT_TOPPINGS);
+  const [showToppings, setShowToppings] = useState(false);
+  const [savingToppings, setSavingToppings] = useState(false);
 
   useEffect(() => {
     load();
     getPriceRules().then((r) => { setPriceRules(r); setPricesDraft(r); });
+    getToppings().then((g) => { setToppingGroups(g); setToppingsDraft(g); });
   }, []);
 
   async function load() {
@@ -180,6 +189,18 @@ export default function MenuPage() {
     showToast("Producto eliminado");
   }
 
+  async function handleSaveToppings() {
+    setSavingToppings(true);
+    try {
+      await saveToppings(toppingsDraft);
+      setToppingGroups(toppingsDraft);
+      showToast("Toppings actualizados");
+      setShowToppings(false);
+    } finally {
+      setSavingToppings(false);
+    }
+  }
+
   async function handleSavePrices() {
     setSavingPrices(true);
     try {
@@ -262,6 +283,17 @@ export default function MenuPage() {
             }}
           >
             + Agregar
+          </button>
+          <button
+            onClick={() => { setToppingsDraft(toppingGroups); setShowToppings(true); }}
+            style={{
+              height: 38, padding: "0 14px", borderRadius: 8,
+              border: `1px solid ${T.border}`, background: T.white,
+              color: T.muted, fontSize: 13, fontWeight: 500, cursor: "pointer",
+              fontFamily: "var(--font-poppins)",
+            }}
+          >
+            Toppings
           </button>
           <button
             onClick={() => { setPricesDraft(priceRules); setShowPrices(true); }}
@@ -600,6 +632,118 @@ export default function MenuPage() {
               }}
             >
               {saving ? "Guardando..." : editItem ? "Guardar cambios" : "Agregar producto"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Toppings panel */}
+      {showToppings && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.4)", display: "flex", justifyContent: "flex-end" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowToppings(false); }}
+        >
+          <div style={{
+            width: "min(480px, 100vw)", height: "100vh", background: T.white,
+            overflowY: "auto", padding: "28px 24px 40px",
+            display: "flex", flexDirection: "column", gap: 20,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>Toppings</h2>
+                <p style={{ margin: "3px 0 0", fontSize: 12, color: T.muted }}>Grupos y opciones disponibles</p>
+              </div>
+              <button onClick={() => setShowToppings(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: T.muted }}>×</button>
+            </div>
+
+            {toppingsDraft.map((group, gi) => (
+              <div key={group.id} style={{ background: T.bg, borderRadius: 10, padding: "14px 16px" }}>
+                {/* Group label */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
+                  <input
+                    value={group.label}
+                    onChange={(e) => setToppingsDraft((prev) => prev.map((g, i) => i === gi ? { ...g, label: e.target.value } : g))}
+                    style={{ ...inputStyle, fontWeight: 600, flex: 1 }}
+                    placeholder="Nombre del grupo"
+                  />
+                  <button
+                    onClick={() => setToppingsDraft((prev) => prev.filter((_, i) => i !== gi))}
+                    style={{ height: 40, width: 40, borderRadius: 8, border: `1px solid ${T.redBorder}`, background: T.redBg, color: T.red, cursor: "pointer", fontSize: 16, flexShrink: 0 }}
+                  >×</button>
+                </div>
+
+                {/* Items */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {group.items.map((item, ii) => (
+                    <div key={ii} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {/* Active toggle */}
+                      <button
+                        onClick={() => setToppingsDraft((prev) => prev.map((g, i) => i === gi
+                          ? { ...g, items: g.items.map((it, j) => j === ii ? { ...it, active: !it.active } : it) }
+                          : g
+                        ))}
+                        title={item.active ? "Desactivar" : "Activar"}
+                        style={{
+                          width: 36, height: 20, borderRadius: 10,
+                          background: item.active ? T.green : T.border,
+                          border: "none", cursor: "pointer", position: "relative",
+                          transition: "background 0.2s", flexShrink: 0,
+                        }}
+                      >
+                        <span style={{
+                          position: "absolute", top: 2,
+                          left: item.active ? 18 : 2,
+                          width: 16, height: 16, borderRadius: "50%",
+                          background: T.white, transition: "left 0.2s", display: "block",
+                        }} />
+                      </button>
+                      <input
+                        value={item.name}
+                        onChange={(e) => setToppingsDraft((prev) => prev.map((g, i) => i === gi
+                          ? { ...g, items: g.items.map((it, j) => j === ii ? { ...it, name: e.target.value } : it) }
+                          : g
+                        ))}
+                        style={{ ...inputStyle, flex: 1, opacity: item.active ? 1 : 0.5 }}
+                        placeholder="Nombre del topping"
+                      />
+                      <button
+                        onClick={() => setToppingsDraft((prev) => prev.map((g, i) => i === gi
+                          ? { ...g, items: g.items.filter((_, j) => j !== ii) }
+                          : g
+                        ))}
+                        style={{ height: 40, width: 40, borderRadius: 8, border: `1px solid ${T.redBorder}`, background: T.redBg, color: T.red, cursor: "pointer", fontSize: 16, flexShrink: 0 }}
+                      >×</button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setToppingsDraft((prev) => prev.map((g, i) => i === gi ? { ...g, items: [...g.items, { name: "", active: true }] } : g))}
+                    style={{ height: 36, borderRadius: 8, border: `1px dashed ${T.border}`, background: "transparent", color: T.muted, fontSize: 12, cursor: "pointer" }}
+                  >
+                    + Agregar topping
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <button
+              onClick={() => setToppingsDraft((prev) => [...prev, { id: `group-${Date.now()}`, label: "", items: [] }])}
+              style={{ height: 40, borderRadius: 9, border: `1px dashed ${T.border}`, background: "transparent", color: T.muted, fontSize: 13, cursor: "pointer" }}
+            >
+              + Agregar grupo
+            </button>
+
+            <button
+              onClick={handleSaveToppings}
+              disabled={savingToppings}
+              style={{
+                height: 44, borderRadius: 9, border: "none",
+                background: savingToppings ? T.slate : T.text,
+                color: savingToppings ? T.mutedLight : T.white,
+                fontSize: 14, fontWeight: 600, cursor: "pointer",
+                fontFamily: "var(--font-poppins)",
+              }}
+            >
+              {savingToppings ? "Guardando..." : "Guardar toppings"}
             </button>
           </div>
         </div>

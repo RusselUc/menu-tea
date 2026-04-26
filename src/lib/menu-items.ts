@@ -142,3 +142,48 @@ export async function getPriceRules(): Promise<PriceRules> {
 export async function savePriceRules(rules: PriceRules): Promise<void> {
   await setDoc(doc(db, "settings", "price_rules"), rules);
 }
+
+// ── Toppings ───────────────────────────────────────────────
+
+export interface ToppingItem {
+  name: string;
+  active: boolean;
+}
+
+export interface ToppingGroup {
+  id: string;
+  label: string;
+  items: ToppingItem[];
+}
+
+export const DEFAULT_TOPPINGS: ToppingGroup[] = [
+  { id: "poppingBoba", label: "Balas Explosivas", items: [
+    { name: "Mora", active: true },
+    { name: "Manzana verde", active: true },
+    { name: "Fresa", active: true },
+    { name: "Chicle", active: true },
+  ]},
+  { id: "jellys", label: "Jelly's", items: [
+    { name: "Mix de frutas tropicales", active: true },
+    { name: "Jelly de Café", active: true },
+  ]},
+];
+
+export async function getToppings(): Promise<ToppingGroup[]> {
+  const snap = await getDoc(doc(db, "settings", "toppings"));
+  if (!snap.exists()) return DEFAULT_TOPPINGS;
+  const groups = snap.data().groups ?? DEFAULT_TOPPINGS;
+  // Normalize: migrate old string[] format to ToppingItem[]
+  return groups.map((g: ToppingGroup) => ({
+    ...g,
+    items: g.items.map((item) =>
+      typeof item === "string"
+        ? { name: item, active: true }
+        : item
+    ),
+  }));
+}
+
+export async function saveToppings(groups: ToppingGroup[]): Promise<void> {
+  await setDoc(doc(db, "settings", "toppings"), { groups });
+}

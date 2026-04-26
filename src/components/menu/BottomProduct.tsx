@@ -1,7 +1,8 @@
 import { FC, useState } from "react";
 import { CartItem, Category, getPrice, Product } from ".";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../ui/drawer";
-import { Flavor, SizeId, sizes, toppings, priceRules as staticPriceRules } from "@/data/menu";
+import { Flavor, SizeId, sizes, toppings as staticToppings, priceRules as staticPriceRules } from "@/data/menu";
+import { ToppingGroup, ToppingItem, DEFAULT_TOPPINGS } from "@/lib/menu-items";
 import { Minus, Plus } from "lucide-react";
 
 const C = {
@@ -23,6 +24,7 @@ interface BottomProductProps {
   category: Category;
   onAddToCart: (item: Omit<CartItem, "id">) => void;
   priceRules?: typeof staticPriceRules;
+  toppingGroups?: ToppingGroup[];
 }
 
 const SectionLabel = ({ children }: { children: React.ReactNode }) => (
@@ -48,6 +50,7 @@ const BottomProduct: FC<BottomProductProps> = ({
   category,
   onAddToCart,
   priceRules = staticPriceRules,
+  toppingGroups = DEFAULT_TOPPINGS,
 }) => {
   const [selectedSize, setSelectedSize] = useState<SizeId>("mediano");
   const [quantity, setQuantity] = useState(1);
@@ -247,69 +250,40 @@ const BottomProduct: FC<BottomProductProps> = ({
             </p>
           </div>
 
-          {/* Balas Explosivas */}
-          <div>
-            <SectionLabel>Balas Explosivas</SectionLabel>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-              {toppings.poppingBoba.map((t) => {
-                const active = selectedToppings.includes(t);
-                return (
-                  <button
-                    key={t}
-                    onClick={() => toggleTopping(t)}
-                    style={{
-                      padding: "6px 14px",
-                      borderRadius: 100,
-                      border: active
-                        ? `1.5px solid ${C.rose}`
-                        : `1.5px solid ${C.border}`,
-                      background: active ? C.rose : C.white,
-                      color: active ? "#FFF" : C.text,
-                      fontSize: 12,
-                      fontWeight: active ? 500 : 400,
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                      fontFamily: "var(--font-poppins)",
-                    }}
-                  >
-                    {t}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Jellys */}
-          <div>
-            <SectionLabel>Jelly&apos;s</SectionLabel>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-              {toppings.jellys.map((t) => {
-                const active = selectedToppings.includes(t);
-                return (
-                  <button
-                    key={t}
-                    onClick={() => toggleTopping(t)}
-                    style={{
-                      padding: "6px 14px",
-                      borderRadius: 100,
-                      border: active
-                        ? `1.5px solid ${C.rose}`
-                        : `1.5px solid ${C.border}`,
-                      background: active ? C.rose : C.white,
-                      color: active ? "#FFF" : C.text,
-                      fontSize: 12,
-                      fontWeight: active ? 500 : 400,
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                      fontFamily: "var(--font-poppins)",
-                    }}
-                  >
-                    {t}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {toppingGroups.map((group) => {
+            const visibleItems = group.items.filter((t: ToppingItem) => t.active && t.name);
+            if (visibleItems.length === 0) return null;
+            return (
+              <div key={group.id}>
+                <SectionLabel>{group.label}</SectionLabel>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                  {visibleItems.map((t: ToppingItem) => {
+                    const active = selectedToppings.includes(t.name);
+                    return (
+                      <button
+                        key={t.name}
+                        onClick={() => toggleTopping(t.name)}
+                        style={{
+                          padding: "6px 14px",
+                          borderRadius: 100,
+                          border: active ? `1.5px solid ${C.rose}` : `1.5px solid ${C.border}`,
+                          background: active ? C.rose : C.white,
+                          color: active ? "#FFF" : C.text,
+                          fontSize: 12,
+                          fontWeight: active ? 500 : 400,
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                          fontFamily: "var(--font-poppins)",
+                        }}
+                      >
+                        {t.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
 
           {/* Quantity */}
           <div>

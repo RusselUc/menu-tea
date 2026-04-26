@@ -3,7 +3,7 @@ import Image from "next/image";
 
 import { categories, Flavor, flavors, priceRules, SizeId } from "@/data/menu";
 import { useState, useEffect } from "react";
-import { getMenuItems, getPriceRules, PriceRules, DEFAULT_PRICE_RULES, MenuItem } from "@/lib/menu-items";
+import { getMenuItems, getPriceRules, getToppings, PriceRules, DEFAULT_PRICE_RULES, ToppingGroup, DEFAULT_TOPPINGS, MenuItem } from "@/lib/menu-items";
 
 import BottomProduct from "./BottomProduct";
 import BottomCart from "./BottomCart";
@@ -157,15 +157,17 @@ const Menu = () => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [firestoreFlavors, setFirestoreFlavors] = useState<Flavor[] | null>(null);
   const [firestorePrices, setFirestorePrices] = useState<PriceRules>(DEFAULT_PRICE_RULES);
+  const [firestoreToppings, setFirestoreToppings] = useState<ToppingGroup[]>(DEFAULT_TOPPINGS);
   const [menuLoading, setMenuLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([getMenuItems(), getPriceRules()])
-      .then(([items, prices]) => {
+    Promise.all([getMenuItems(), getPriceRules(), getToppings()])
+      .then(([items, prices, toppings]) => {
         if (items.length > 0) {
           setFirestoreFlavors(items.filter((i) => i.active).map(menuItemToFlavor));
         }
         setFirestorePrices(prices);
+        setFirestoreToppings(toppings);
       })
       .catch(() => { /* silently fall back to static */ })
       .finally(() => setMenuLoading(false));
@@ -644,6 +646,7 @@ const Menu = () => {
           onClose={() => setIsProductModalOpen(false)}
           category={selectedCategory}
           priceRules={firestorePrices}
+          toppingGroups={firestoreToppings}
           onAddToCart={handleAddToCart}
         />
       )}
