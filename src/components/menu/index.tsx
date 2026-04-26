@@ -1,12 +1,13 @@
 "use client";
 import Image from "next/image";
 
-import { categories, Flavor, flavors, priceRules, SizeId } from "@/data/menu";
+import { categories, Flavor, flavors, priceRules, SizeId, sizes } from "@/data/menu";
 import { useState, useEffect } from "react";
 import { getMenuItems, getPriceRules, getToppings, PriceRules, DEFAULT_PRICE_RULES, ToppingGroup, DEFAULT_TOPPINGS, MenuItem } from "@/lib/menu-items";
 
 import BottomProduct from "./BottomProduct";
 import BottomCart from "./BottomCart";
+import { Drawer, DrawerContent } from "../ui/drawer";
 
 /* ─── Brand tokens ─────────────────────────────────────── */
 const C = {
@@ -127,6 +128,29 @@ const Placeholder = ({ name }: { name: string }) => (
   </div>
 );
 
+/* ─── Random drink ─────────────────────────────────────── */
+interface RandomDraw {
+  flavor: Flavor;
+  category: { id: string; name: string };
+  topping: string;
+}
+
+function pickRandom(
+  activeFlavors: Flavor[],
+  activeCategories: typeof categories,
+  toppingGroups: ToppingGroup[],
+): RandomDraw | null {
+  const cat = activeCategories[Math.floor(Math.random() * activeCategories.length)];
+  const available = activeFlavors.filter((f) => f.categories.includes(cat.id));
+  if (!available.length) return null;
+  const flavor = available[Math.floor(Math.random() * available.length)];
+  const allToppings = toppingGroups.flatMap((g) =>
+    g.items.filter((t) => t.active && t.name).map((t) => t.name)
+  );
+  const topping = allToppings[Math.floor(Math.random() * allToppings.length)] ?? "";
+  return { flavor, category: cat, topping };
+}
+
 /* ─── Helpers to map Firestore items → Flavor ─────────── */
 function menuItemToFlavor(item: MenuItem): Flavor {
   const staticFlavor = flavors.find((f) => f.id === item.id);
@@ -158,6 +182,7 @@ const Menu = () => {
   const [firestoreFlavors, setFirestoreFlavors] = useState<Flavor[] | null>(null);
   const [firestorePrices, setFirestorePrices] = useState<PriceRules>(DEFAULT_PRICE_RULES);
   const [firestoreToppings, setFirestoreToppings] = useState<ToppingGroup[]>(DEFAULT_TOPPINGS);
+  const [randomDraw, setRandomDraw] = useState<RandomDraw | null>(null);
   const [menuLoading, setMenuLoading] = useState(true);
 
   useEffect(() => {
@@ -190,6 +215,10 @@ const Menu = () => {
     setCartItems((prev) => prev.filter((i) => i.id !== id));
 
   const handleClearCart = () => setCartItems([]);
+
+  function handleSurprise() {
+    setRandomDraw(pickRandom(activeFlavors, categories, firestoreToppings));
+  }
 
   const visible = activeFlavors.filter((f) =>
     f.categories.includes(selectedCategory.id)
@@ -371,16 +400,26 @@ const Menu = () => {
         >
           {categories.find((c) => c.id === selectedCategory.id)?.name}
         </h2>
-        <p
-          style={{
-            margin: "5px 0 0",
-            fontSize: 12,
-            color: C.muted,
-            fontWeight: 400,
-          }}
-        >
-          {menuLoading ? "Cargando..." : `${visible.length} opciones disponibles`}
-        </p>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
+          <p style={{ margin: 0, fontSize: 12, color: C.muted, fontWeight: 400 }}>
+            {menuLoading ? "Cargando..." : `${visible.length} opciones disponibles`}
+          </p>
+          <button
+            onClick={handleSurprise}
+            style={{
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "5px 12px", borderRadius: 100,
+              border: `1.5px solid ${C.pink}`,
+              background: "rgba(242,152,170,0.1)",
+              color: C.dark, cursor: "pointer",
+              fontSize: 11, fontWeight: 600,
+              fontFamily: "var(--font-poppins)",
+              letterSpacing: "0.02em",
+            }}
+          >
+            🎲 Sorpréndeme
+          </button>
+        </div>
       </div>
 
       {/* ── Product list ────────────────────────────── */}
@@ -658,8 +697,149 @@ const Menu = () => {
         onRemoveItem={handleRemoveFromCart}
         onClearCart={handleClearCart}
       />
+
+      {/* ── Sorpréndeme drawer ───────────────────────── */}
+      {randomDraw && (
+        <SurpriseDrawer
+          draw={randomDraw}
+          firestorePrices={firestorePrices}
+          onAdd={(item) => { handleAddToCart(item); setRandomDraw(null); }}
+          onReshuffle={handleSurprise}
+          onClose={() => setRandomDraw(null)}
+        />
+      )}
     </div>
   );
 };
+
+function SurpriseDrawer({
+  draw,
+  firestorePrices,
+  onAdd,
+  onReshuffle,
+  onClose,
+}: {
+  draw: RandomDraw;
+  firestorePrices: typeof priceRules;
+  onAdd: (item: Omit<CartItem, "id">) => void;
+  onReshuffle: () => void;
+  onClose: () => void;
+}) {
+  const { flavor, category, topping } = draw;
+  const [selectedSize, setSelectedSize] = useState<SizeId>("mediano");
+
+  const base = getPrice(flavor, selectedSize, category.id, firestorePrices) ?? 0;
+  const price = base + (topping ? 0 : 0); // 1 topping is always free
+
+  const imgSrc = getImage(flavor, category.id);
+  const desc = getDesc(flavor, category.id);
+  const sizeLabels: Record<string, string> = {
+    mediano: "Mediano · 16oz",
+    grande: "Grande · 24oz",
+    pandi: "Pandi · 24oz",
+  };
+
+  return (
+    <Drawer open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DrawerContent style={{ backgroundColor: C.cream, borderTop: `3px solid ${C.rose}` }}>
+        <div style={{ height: 4, backgroundColor: C.rose }} />
+        <div style={{ width: 36, height: 3, borderRadius: 2, backgroundColor: C.border, margin: "10px auto 0" }} />
+
+        <div style={{ padding: "20px 24px 36px", display: "flex", flexDirection: "column", gap: 18, overflowY: "auto" }}>
+          {/* Title */}
+          <p style={{ margin: 0, textAlign: "center", fontSize: 13, fontWeight: 600, color: C.olive, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            Tu bebida del destino ✨
+          </p>
+
+          {/* Card */}
+          <div style={{ background: C.white, borderRadius: 20, boxShadow: "0 4px 24px rgba(0,0,0,0.08)", overflow: "hidden", border: `1px solid ${C.border}` }}>
+            {imgSrc && (
+              <Image src={imgSrc} alt={flavor.name} width={600} height={200}
+                style={{ width: "100%", height: 180, objectFit: "cover", display: "block" }} />
+            )}
+            <div style={{ padding: "14px 16px" }}>
+              <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.dark, letterSpacing: "-0.02em" }}>{flavor.name}</p>
+              <p style={{ margin: "2px 0 8px", fontSize: 12, color: C.muted }}>{category.name}</p>
+              {desc && <p style={{ margin: "0 0 10px", fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{desc}</p>}
+              {topping && (
+                <span style={{ fontSize: 11, fontWeight: 500, padding: "4px 10px", borderRadius: 100, background: "rgba(121,135,76,0.1)", color: C.olive }}>
+                  {topping}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Size selector */}
+          <div>
+            <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 600, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              Elige tu tamaño
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              {sizes.map((s) => {
+                const sizePrice = getPrice(flavor, s.id, category.id, firestorePrices) ?? 0;
+                const active = selectedSize === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setSelectedSize(s.id)}
+                    style={{
+                      flex: 1, padding: "10px 6px", borderRadius: 12,
+                      border: active ? `2px solid ${C.rose}` : `1.5px solid ${C.border}`,
+                      background: active ? "rgba(205,87,106,0.06)" : C.white,
+                      cursor: "pointer", fontFamily: "var(--font-poppins)",
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                    }}
+                  >
+                    <span style={{ fontSize: 11, fontWeight: 600, color: active ? C.rose : C.muted }}>
+                      {sizeLabels[s.id]?.split(" · ")[0]}
+                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: active ? C.dark : C.muted }}>
+                      ${sizePrice}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <button
+              onClick={() => onAdd({
+                productId: flavor.id,
+                name: flavor.name,
+                flavor: flavor.name,
+                size: selectedSize,
+                category: category.name,
+                toppings: topping ? [topping] : [],
+                price,
+                quantity: 1,
+              })}
+              style={{
+                height: 52, borderRadius: 14, border: "none",
+                background: C.dark, color: "#FFF",
+                fontSize: 14, fontWeight: 600, cursor: "pointer",
+                fontFamily: "var(--font-poppins)",
+              }}
+            >
+              Agregar al carrito · ${price.toFixed(2)}
+            </button>
+            <button
+              onClick={onReshuffle}
+              style={{
+                height: 44, borderRadius: 12, border: `1.5px solid ${C.pink}`,
+                background: "transparent", color: C.dark,
+                fontSize: 13, fontWeight: 600, cursor: "pointer",
+                fontFamily: "var(--font-poppins)",
+              }}
+            >
+              🎲 Otra opción
+            </button>
+          </div>
+        </div>
+      </DrawerContent>
+    </Drawer>
+  );
+}
 
 export default Menu;
