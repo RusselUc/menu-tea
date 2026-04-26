@@ -753,20 +753,95 @@ function SurpriseDrawer({
 
           {/* Card */}
           <div style={{ background: C.white, borderRadius: 20, boxShadow: "0 4px 24px rgba(0,0,0,0.08)", overflow: "hidden", border: `1px solid ${C.border}` }}>
-            {imgSrc && (
-              <Image src={imgSrc} alt={flavor.name} width={600} height={200}
-                style={{ width: "100%", height: 180, objectFit: "cover", display: "block" }} />
+            {imgSrc ? (
+              <>
+                {/* Image with name overlaid via gradient scrim */}
+                <div style={{ position: "relative", height: 200 }}>
+                  <Image
+                    src={imgSrc}
+                    alt={flavor.name}
+                    fill
+                    quality={90}
+                    style={{ objectFit: "cover" }}
+                    sizes="(max-width: 600px) 100vw, 600px"
+                  />
+                  {/* Deep gradient scrim from bottom */}
+                  <div style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "linear-gradient(to bottom, transparent 30%, rgba(15,8,4,0.82) 100%)",
+                  }} />
+                  {/* Name + chips overlaid */}
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "12px 16px 14px" }}>
+                    {/* Category + topping chips */}
+                    <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+                      <span style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        color: "#FFFFFF",
+                        background: "rgba(205,87,106,0.75)",
+                        backdropFilter: "blur(4px)",
+                        padding: "3px 9px",
+                        borderRadius: 100,
+                        fontFamily: "var(--font-poppins)",
+                      }}>
+                        {category.name}
+                      </span>
+                      {topping && (
+                        <span style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          letterSpacing: "0.04em",
+                          color: "#FFFFFF",
+                          background: "rgba(121,135,76,0.75)",
+                          backdropFilter: "blur(4px)",
+                          padding: "3px 9px",
+                          borderRadius: 100,
+                          fontFamily: "var(--font-poppins)",
+                        }}>
+                          {topping}
+                        </span>
+                      )}
+                    </div>
+                    <p style={{
+                      margin: 0,
+                      fontSize: 22,
+                      fontWeight: 700,
+                      color: "#FFFFFF",
+                      letterSpacing: "-0.025em",
+                      lineHeight: 1.15,
+                      textShadow: "0 1px 8px rgba(0,0,0,0.4)",
+                      fontFamily: "var(--font-poppins)",
+                    }}>
+                      {flavor.name}
+                    </p>
+                  </div>
+                </div>
+                {/* Below image: desc only */}
+                {desc && (
+                  <div style={{ padding: "12px 16px 14px" }}>
+                    <p style={{ margin: 0, fontSize: 12, color: C.muted, lineHeight: 1.5, fontFamily: "var(--font-poppins)" }}>{desc}</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ padding: "14px 16px" }}>
+                <p style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 700, color: C.text, letterSpacing: "-0.02em", fontFamily: "var(--font-poppins)" }}>{flavor.name}</p>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: desc ? 10 : 0 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#FFF", background: C.rose, padding: "3px 9px", borderRadius: 100, fontFamily: "var(--font-poppins)" }}>
+                    {category.name}
+                  </span>
+                  {topping && (
+                    <span style={{ fontSize: 10, fontWeight: 600, color: C.olive, background: "rgba(121,135,76,0.12)", padding: "3px 9px", borderRadius: 100, fontFamily: "var(--font-poppins)" }}>
+                      {topping}
+                    </span>
+                  )}
+                </div>
+                {desc && <p style={{ margin: 0, fontSize: 12, color: C.muted, lineHeight: 1.5, fontFamily: "var(--font-poppins)" }}>{desc}</p>}
+              </div>
             )}
-            <div style={{ padding: "14px 16px" }}>
-              <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.dark, letterSpacing: "-0.02em" }}>{flavor.name}</p>
-              <p style={{ margin: "2px 0 8px", fontSize: 12, color: C.muted }}>{category.name}</p>
-              {desc && <p style={{ margin: "0 0 10px", fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{desc}</p>}
-              {topping && (
-                <span style={{ fontSize: 11, fontWeight: 500, padding: "4px 10px", borderRadius: 100, background: "rgba(121,135,76,0.1)", color: C.olive }}>
-                  {topping}
-                </span>
-              )}
-            </div>
           </div>
 
           {/* Size selector */}
