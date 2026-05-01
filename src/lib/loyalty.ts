@@ -1,9 +1,15 @@
 import {
   doc,
   getDoc,
+  getDocs,
   setDoc,
   updateDoc,
   arrayUnion,
+  collection,
+  orderBy,
+  query,
+  limit,
+  getCountFromServer,
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -72,6 +78,21 @@ export async function addStamp(
   };
 
   return { card: updated, earnedFree };
+}
+
+export async function getTotalCards(): Promise<number> {
+  const snap = await getCountFromServer(collection(db, "loyalty_cards"));
+  return snap.data().count;
+}
+
+export async function getRecentCards(n = 10): Promise<LoyaltyCard[]> {
+  const q = query(
+    collection(db, "loyalty_cards"),
+    orderBy("createdAt", "desc"),
+    limit(n)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => d.data() as LoyaltyCard);
 }
 
 export async function redeemFreeDrink(phone: string): Promise<void> {

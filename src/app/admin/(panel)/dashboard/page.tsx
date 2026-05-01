@@ -44,13 +44,14 @@ const STATUS = {
 };
 
 // ── Period filter ────────────────────────────────────────
-type Period = "today" | "week" | "month" | "all";
+type Period = "today" | "week" | "month" | "all" | "date";
 
 const PERIODS: { id: Period; label: string }[] = [
   { id: "today", label: "Hoy" },
   { id: "week",  label: "Semana" },
   { id: "month", label: "Mes" },
   { id: "all",   label: "Todo" },
+  { id: "date",  label: "Fecha" },
 ];
 
 // ── Helpers ─────────────────────────────────────────────
@@ -64,24 +65,39 @@ function timeAgo(ts: { toDate: () => Date }): string {
   return `${Math.floor(h / 24)}d`;
 }
 
-function getRangeStart(period: Period): Date {
+function getRangeStart(period: Period, selectedDate?: string): Date {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if (period === "today") return today;
   if (period === "week")  { const d = new Date(today); d.setDate(d.getDate() - 6); return d; }
   if (period === "month") { const d = new Date(today); d.setDate(d.getDate() - 29); return d; }
+  if (period === "date" && selectedDate) {
+    const [y, m, d] = selectedDate.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
   return new Date(0);
 }
 
-function computeStats(orders: Order[], period: Period) {
+function computeStats(orders: Order[], period: Period, selectedDate?: string) {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const rangeStart = getRangeStart(period);
+  const rangeStart = getRangeStart(period, selectedDate);
 
   const allActive = orders.filter((o) => o.status !== "cancelled");
-  const periodOrders = period === "all"
-    ? orders
-    : orders.filter((o) => (o.timestamp?.toDate() ?? new Date(0)) >= rangeStart);
+
+  let periodOrders: Order[];
+  if (period === "all") {
+    periodOrders = orders;
+  } else if (period === "date" && selectedDate) {
+    const dayEnd = new Date(rangeStart); dayEnd.setDate(dayEnd.getDate() + 1);
+    periodOrders = orders.filter((o) => {
+      const od = o.timestamp?.toDate() ?? new Date(0);
+      return od >= rangeStart && od < dayEnd;
+    });
+  } else {
+    periodOrders = orders.filter((o) => (o.timestamp?.toDate() ?? new Date(0)) >= rangeStart);
+  }
+
   const periodActive = periodOrders.filter((o) => o.status !== "cancelled");
   const periodDelivered = periodOrders.filter((o) => o.status === "delivered");
   const periodCancelled = periodOrders.filter((o) => o.status === "cancelled");
@@ -99,7 +115,25 @@ function computeStats(orders: Order[], period: Period) {
 
   let chartData: { label: string; count: number; isToday: boolean }[];
 
-  if (period === "today" || period === "week") {
+  if (period === "date" && selectedDate) {
+    // 7 days centered on selected date (3 before, selected, 3 after)
+    const [y, m, d] = selectedDate.split("-").map(Number);
+    const selDay = new Date(y, m - 1, d);
+    chartData = Array.from({ length: 7 }, (_, i) => {
+      const day = new Date(selDay); day.setDate(day.getDate() - 3 + i);
+      const next = new Date(day); next.setDate(next.getDate() + 1);
+      const label = day.toLocaleDateString("es-MX", { day: "numeric", month: "short" }).replace(" de ", "/").slice(0, 5);
+      const isSel = i === 3;
+      return {
+        label,
+        isToday: isSel,
+        count: allActive.filter((o) => {
+          const od = o.timestamp?.toDate();
+          return od && od >= day && od < next;
+        }).length,
+      };
+    });
+  } else if (period === "today" || period === "week") {
     // 7 days
     chartData = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(todayStart);
@@ -223,6 +257,7 @@ export default function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [period, setPeriod] = useState<Period>("today");
+  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
 
   async function load() {
     const o = await getOrders();
@@ -245,10 +280,12 @@ export default function DashboardPage() {
   }
 
   const { count, revenue, pending, cancelled, chartData, topFlavors, periodOrders } =
-    computeStats(orders, period);
+    computeStats(orders, period, selectedDate);
   const topFlavorMax = topFlavors[0]?.[1] || 1;
 
-  const periodLabel = { today: "hoy", week: "esta semana", month: "este mes", all: "en total" }[period];
+  const periodLabel = period === "date"
+    ? new Date(selectedDate + "T12:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
+    : ({ today: "hoy", week: "esta semana", month: "este mes", all: "en total" } as Record<string, string>)[period];
   const todayStr = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
   const displayOrders = periodOrders.slice().sort(
     (a, b) => (b.timestamp?.toDate().getTime() ?? 0) - (a.timestamp?.toDate().getTime() ?? 0)
@@ -320,6 +357,25 @@ export default function DashboardPage() {
             </button>
           ))}
         </div>
+
+        {/* Date picker — shown only when period === "date" */}
+        {period === "date" && (
+          <div style={{ marginBottom: 20 }}>
+            <input
+              type="date"
+              value={selectedDate}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              style={{
+                height: 36, padding: "0 12px",
+                borderRadius: 8, border: `1px solid ${T.border}`,
+                background: T.white, color: T.text,
+                fontSize: 13, fontFamily: "var(--font-poppins)",
+                outline: "none", cursor: "pointer",
+              }}
+            />
+          </div>
+        )}
 
         {/* Stat cards */}
         <div className="dash-stats" style={{ marginBottom: 16 }}>

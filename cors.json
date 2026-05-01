@@ -1,0 +1,7 @@
+[
+  {
+    "origin": ["http://localhost:3000", "https://tea-sueno.vercel.app"],
+    "method": ["GET", "POST", "PUT", "DELETE"],
+    "maxAgeSeconds": 3600
+  }
+]
