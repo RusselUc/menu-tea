@@ -5,7 +5,7 @@ import {
   updateDoc,
   query,
   orderBy,
-  limit,
+  where,
   addDoc,
   Timestamp,
 } from "firebase/firestore";
@@ -59,14 +59,25 @@ export function getOrderLabel(order: Order): string {
   return "Pedido";
 }
 
-export async function getOrders(limitCount = 200): Promise<Order[]> {
-  const q = query(
-    collection(db, "orders"),
-    orderBy("timestamp", "desc"),
-    limit(limitCount)
-  );
+export async function getOrders(from?: Date, to?: Date): Promise<Order[]> {
+  let q = query(collection(db, "orders"), orderBy("timestamp", "desc"));
+  if (from) q = query(q, where("timestamp", ">=", Timestamp.fromDate(from)));
+  if (to) {
+    const toEnd = new Date(to);
+    toEnd.setDate(toEnd.getDate() + 1);
+    q = query(q, where("timestamp", "<", Timestamp.fromDate(toEnd)));
+  }
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Order));
+}
+
+export async function getPendingCount(): Promise<number> {
+  const q = query(
+    collection(db, "orders"),
+    where("status", "in", ["pending", "success"])
+  );
+  const snap = await getDocs(q);
+  return snap.size;
 }
 
 export async function updateOrderStatus(

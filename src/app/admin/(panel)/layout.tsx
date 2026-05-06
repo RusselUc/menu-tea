@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { BarChart2, Heart, UtensilsCrossed } from "lucide-react";
+import logoPink from "@/assets/images/logo-pink.png";
 
 const NAV = [
   { href: "/admin/dashboard", label: "Métricas", icon: BarChart2 },
@@ -125,23 +126,8 @@ export default function AdminPanelLayout({
       <div className="admin-shell">
         {/* Sidebar */}
         <aside className="admin-sidebar">
-          <div style={{ padding: "20px 14px 16px", borderBottom: "1px solid #F1F5F9" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{
-                width: 34, height: 34, borderRadius: 9,
-                background: "#FEE2E2",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 18, flexShrink: 0,
-              }}>
-                🧋
-              </div>
-              <div>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#0F172A" }}>
-                  Té Sueño
-                </p>
-                <p style={{ margin: 0, fontSize: 11, color: "#94A3B8" }}>Panel Admin</p>
-              </div>
-            </div>
+          <div style={{ padding: "18px 14px 16px", borderBottom: "1px solid #F1F5F9" }}>
+            <img src={logoPink.src} alt="Té Sueño" style={{ height: 32, width: "auto" }} />
           </div>
 
           <nav style={{ padding: "12px 10px", display: "flex", flexDirection: "column", gap: 2 }}>

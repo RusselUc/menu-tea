@@ -1,6 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { CalendarIcon, RefreshCw } from "lucide-react";
+import { type DateRange } from "react-day-picker";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
   getOrders,
   updateOrderStatus,
@@ -44,14 +49,14 @@ const STATUS = {
 };
 
 // ── Period filter ────────────────────────────────────────
-type Period = "today" | "week" | "month" | "all" | "date";
+type Period = "today" | "week" | "month" | "all" | "range";
 
 const PERIODS: { id: Period; label: string }[] = [
   { id: "today", label: "Hoy" },
   { id: "week",  label: "Semana" },
   { id: "month", label: "Mes" },
   { id: "all",   label: "Todo" },
-  { id: "date",  label: "Fecha" },
+  { id: "range", label: "Rango" },
 ];
 
 // ── Helpers ─────────────────────────────────────────────
@@ -65,46 +70,28 @@ function timeAgo(ts: { toDate: () => Date }): string {
   return `${Math.floor(h / 24)}d`;
 }
 
-function getRangeStart(period: Period, selectedDate?: string): Date {
+function getDateBounds(period: Period, dateRange?: DateRange): { from?: Date; to?: Date } {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (period === "today") return today;
-  if (period === "week")  { const d = new Date(today); d.setDate(d.getDate() - 6); return d; }
-  if (period === "month") { const d = new Date(today); d.setDate(d.getDate() - 29); return d; }
-  if (period === "date" && selectedDate) {
-    const [y, m, d] = selectedDate.split("-").map(Number);
-    return new Date(y, m - 1, d);
-  }
-  return new Date(0);
+  if (period === "today") return { from: today };
+  if (period === "week")  { const d = new Date(today); d.setDate(d.getDate() - 6); return { from: d }; }
+  if (period === "month") { const d = new Date(today); d.setDate(d.getDate() - 29); return { from: d }; }
+  if (period === "range") return { from: dateRange?.from, to: dateRange?.to ?? dateRange?.from };
+  return {}; // "all"
 }
 
-function computeStats(orders: Order[], period: Period, selectedDate?: string) {
+function computeStats(orders: Order[], period: Period, dateRange?: DateRange) {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const rangeStart = getRangeStart(period, selectedDate);
 
+  // Orders already come date-filtered from Firestore
   const allActive = orders.filter((o) => o.status !== "cancelled");
+  const periodDelivered = orders.filter((o) => o.status === "delivered");
+  const periodCancelled = orders.filter((o) => o.status === "cancelled");
 
-  let periodOrders: Order[];
-  if (period === "all") {
-    periodOrders = orders;
-  } else if (period === "date" && selectedDate) {
-    const dayEnd = new Date(rangeStart); dayEnd.setDate(dayEnd.getDate() + 1);
-    periodOrders = orders.filter((o) => {
-      const od = o.timestamp?.toDate() ?? new Date(0);
-      return od >= rangeStart && od < dayEnd;
-    });
-  } else {
-    periodOrders = orders.filter((o) => (o.timestamp?.toDate() ?? new Date(0)) >= rangeStart);
-  }
-
-  const periodActive = periodOrders.filter((o) => o.status !== "cancelled");
-  const periodDelivered = periodOrders.filter((o) => o.status === "delivered");
-  const periodCancelled = periodOrders.filter((o) => o.status === "cancelled");
-
-  const count    = periodActive.length;
-  const revenue  = periodDelivered.reduce((s, o) => s + getOrderTotal(o), 0);
-  const pending  = orders.filter((o) => o.status === "pending" || o.status === "success").length;
+  const count     = allActive.length;
+  const revenue   = periodDelivered.reduce((s, o) => s + getOrderTotal(o), 0);
+  const pending   = orders.filter((o) => o.status === "pending" || o.status === "success").length;
   const cancelled = periodCancelled.length;
 
   // ── Chart data ──
@@ -115,24 +102,47 @@ function computeStats(orders: Order[], period: Period, selectedDate?: string) {
 
   let chartData: { label: string; count: number; isToday: boolean }[];
 
-  if (period === "date" && selectedDate) {
-    // 7 days centered on selected date (3 before, selected, 3 after)
-    const [y, m, d] = selectedDate.split("-").map(Number);
-    const selDay = new Date(y, m - 1, d);
-    chartData = Array.from({ length: 7 }, (_, i) => {
-      const day = new Date(selDay); day.setDate(day.getDate() - 3 + i);
-      const next = new Date(day); next.setDate(next.getDate() + 1);
-      const label = day.toLocaleDateString("es-MX", { day: "numeric", month: "short" }).replace(" de ", "/").slice(0, 5);
-      const isSel = i === 3;
-      return {
-        label,
-        isToday: isSel,
-        count: allActive.filter((o) => {
-          const od = o.timestamp?.toDate();
-          return od && od >= day && od < next;
-        }).length,
-      };
-    });
+  if (period === "range" && dateRange?.from) {
+    const from = dateRange.from;
+    const to = dateRange.to ?? from;
+    const diffDays = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
+
+    if (diffDays <= 31) {
+      // Daily bars
+      chartData = Array.from({ length: diffDays }, (_, i) => {
+        const day = new Date(from); day.setDate(day.getDate() + i);
+        const next = new Date(day); next.setDate(next.getDate() + 1);
+        const isToday = day.toDateString() === todayStart.toDateString();
+        const label = day.toLocaleDateString("es-MX", { day: "numeric", month: "short" })
+          .replace(" de ", "/").slice(0, 5);
+        return {
+          label,
+          isToday,
+          count: allActive.filter((o) => {
+            const od = o.timestamp?.toDate();
+            return od && od >= day && od < next;
+          }).length,
+        };
+      });
+    } else {
+      // Weekly bars (up to ~12 weeks)
+      const weeks = Math.ceil(diffDays / 7);
+      chartData = Array.from({ length: weeks }, (_, i) => {
+        const wStart = new Date(from); wStart.setDate(wStart.getDate() + i * 7);
+        const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate() + 7);
+        const label = wStart.toLocaleDateString("es-MX", { day: "numeric", month: "short" })
+          .replace(" de ", "/").slice(0, 5);
+        const isToday = todayStart >= wStart && todayStart < wEnd;
+        return {
+          label,
+          isToday,
+          count: allActive.filter((o) => {
+            const od = o.timestamp?.toDate();
+            return od && od >= wStart && od < wEnd;
+          }).length,
+        };
+      });
+    }
   } else if (period === "today" || period === "week") {
     // 7 days
     chartData = Array.from({ length: 7 }, (_, i) => {
@@ -179,15 +189,15 @@ function computeStats(orders: Order[], period: Period, selectedDate?: string) {
     });
   }
 
-  // ── Top flavors (from period) ──
+  // ── Top flavors ──
   const flavors: Record<string, number> = {};
-  periodActive.forEach((o) => {
+  allActive.forEach((o) => {
     if (o.items) o.items.forEach((i) => { flavors[i.flavor] = (flavors[i.flavor] || 0) + i.quantity; });
     else if (o.flavor) flavors[o.flavor] = (flavors[o.flavor] || 0) + (o.quantity || 1);
   });
   const topFlavors = Object.entries(flavors).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
-  return { count, revenue, pending, cancelled, chartData, topFlavors, periodOrders };
+  return { count, revenue, pending, cancelled, chartData, topFlavors, periodOrders: orders };
 }
 
 // ── Sub-components ──────────────────────────────────────
@@ -257,18 +267,34 @@ export default function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [period, setPeriod] = useState<Period>("today");
-  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return { from: today, to: today };
+  });
 
-  async function load() {
-    const o = await getOrders();
+  async function fetchData() {
+    const bounds = getDateBounds(period, dateRange);
+    const o = await getOrders(bounds.from, bounds.to);
     setOrders(o);
   }
 
-  useEffect(() => { load().then(() => setLoading(false)); }, []);
+  // Re-fetch whenever period or dateRange changes
+  useEffect(() => {
+    if (period === "range" && !dateRange?.from) return;
+    let active = true;
+    const bounds = getDateBounds(period, dateRange);
+    getOrders(bounds.from, bounds.to).then((o) => {
+      if (!active) return;
+      setOrders(o);
+      setLoading(false);
+    });
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, dateRange]);
 
   async function handleRefresh() {
     setRefreshing(true);
-    await load();
+    await fetchData();
     setRefreshing(false);
   }
 
@@ -280,11 +306,15 @@ export default function DashboardPage() {
   }
 
   const { count, revenue, pending, cancelled, chartData, topFlavors, periodOrders } =
-    computeStats(orders, period, selectedDate);
+    computeStats(orders, period, dateRange);
   const topFlavorMax = topFlavors[0]?.[1] || 1;
 
-  const periodLabel = period === "date"
-    ? new Date(selectedDate + "T12:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
+  const periodLabel = period === "range"
+    ? dateRange?.from
+      ? dateRange.to && dateRange.to.toDateString() !== dateRange.from.toDateString()
+        ? `${format(dateRange.from, "d MMM", { locale: es })} – ${format(dateRange.to, "d MMM", { locale: es })}`
+        : format(dateRange.from, "d 'de' MMMM", { locale: es })
+      : "rango seleccionado"
     : ({ today: "hoy", week: "esta semana", month: "este mes", all: "en total" } as Record<string, string>)[period];
   const todayStr = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
   const displayOrders = periodOrders.slice().sort(
@@ -358,22 +388,43 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Date picker — shown only when period === "date" */}
-        {period === "date" && (
+        {/* Date range picker — shown only when period === "range" */}
+        {period === "range" && (
           <div style={{ marginBottom: 20 }}>
-            <input
-              type="date"
-              value={selectedDate}
-              max={new Date().toISOString().slice(0, 10)}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              style={{
-                height: 36, padding: "0 12px",
-                borderRadius: 8, border: `1px solid ${T.border}`,
-                background: T.white, color: T.text,
-                fontSize: 13, fontFamily: "var(--font-poppins)",
-                outline: "none", cursor: "pointer",
-              }}
-            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    height: 36, padding: "0 14px",
+                    borderRadius: 8, border: `1px solid ${T.border}`,
+                    background: T.white, color: dateRange?.from ? T.text : T.muted,
+                    fontSize: 13, fontFamily: "var(--font-poppins)",
+                    cursor: "pointer", minWidth: 220, textAlign: "left",
+                  }}
+                >
+                  <CalendarIcon size={14} style={{ flexShrink: 0, color: T.muted }} />
+                  {dateRange?.from ? (
+                    dateRange.to && dateRange.to.toDateString() !== dateRange.from.toDateString()
+                      ? `${format(dateRange.from, "d MMM yyyy", { locale: es })} – ${format(dateRange.to, "d MMM yyyy", { locale: es })}`
+                      : format(dateRange.from, "d MMM yyyy", { locale: es })
+                  ) : (
+                    "Selecciona un rango"
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" style={{ width: "auto", padding: 0 }}>
+                <Calendar
+                  mode="range"
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  numberOfMonths={2}
+                  disabled={{ after: new Date() }}
+                  locale={es}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         )}
 
@@ -391,7 +442,7 @@ export default function DashboardPage() {
           <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: T.text }}>
-                {period === "all" ? "Por mes" : period === "month" ? "Por semana" : "Por día"}
+                {period === "all" ? "Por mes" : period === "month" ? "Por semana" : period === "range" && dateRange?.from && dateRange.to && Math.round((dateRange.to.getTime() - dateRange.from.getTime()) / 86400000) >= 31 ? "Por semana" : "Por día"}
               </p>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: T.blue }} />
