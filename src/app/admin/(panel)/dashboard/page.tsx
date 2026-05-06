@@ -70,14 +70,16 @@ function timeAgo(ts: { toDate: () => Date }): string {
   return `${Math.floor(h / 24)}d`;
 }
 
-function getDateBounds(period: Period, dateRange?: DateRange): { from?: Date; to?: Date } {
+const ALL_LIMIT = 500;
+
+function getDateBounds(period: Period, dateRange?: DateRange): { from?: Date; to?: Date; limitCount?: number } {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if (period === "today") return { from: today };
   if (period === "week")  { const d = new Date(today); d.setDate(d.getDate() - 6); return { from: d }; }
   if (period === "month") { const d = new Date(today); d.setDate(d.getDate() - 29); return { from: d }; }
-  if (period === "range") return { from: dateRange?.from, to: dateRange?.to ?? dateRange?.from };
-  return {}; // "all"
+  if (period === "range") return { from: dateRange?.from, to: dateRange?.to };
+  return { limitCount: ALL_LIMIT }; // "all" — limit para evitar traer toda la coleccion
 }
 
 function computeStats(orders: Order[], period: Period, dateRange?: DateRange) {
@@ -272,29 +274,41 @@ export default function DashboardPage() {
     return { from: today, to: today };
   });
 
-  async function fetchData() {
-    const bounds = getDateBounds(period, dateRange);
-    const o = await getOrders(bounds.from, bounds.to);
-    setOrders(o);
-  }
+  const [rangeFetching, setRangeFetching] = useState(false);
 
-  // Re-fetch whenever period or dateRange changes
+  // Auto-fetch para periodos fijos (today/week/month/all)
   useEffect(() => {
-    if (period === "range" && !dateRange?.from) return;
+    if (period === "range") {
+      setOrders([]); // limpiar al entrar al modo rango
+      setLoading(false);
+      return;
+    }
     let active = true;
     const bounds = getDateBounds(period, dateRange);
-    getOrders(bounds.from, bounds.to).then((o) => {
+    getOrders(bounds.from, bounds.to, bounds.limitCount).then((o) => {
       if (!active) return;
       setOrders(o);
       setLoading(false);
     });
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, dateRange]);
+  }, [period]);
+
+  // Fetch manual para rango — llamado por el botón "Consultar"
+  async function handleRangeFetch() {
+    if (!dateRange?.from || !dateRange?.to) return;
+    setRangeFetching(true);
+    const bounds = getDateBounds("range", dateRange);
+    const o = await getOrders(bounds.from, bounds.to);
+    setOrders(o);
+    setRangeFetching(false);
+  }
 
   async function handleRefresh() {
     setRefreshing(true);
-    await fetchData();
+    const bounds = getDateBounds(period, dateRange);
+    const o = await getOrders(bounds.from, bounds.to, bounds.limitCount);
+    setOrders(o);
     setRefreshing(false);
   }
 
@@ -390,7 +404,7 @@ export default function DashboardPage() {
 
         {/* Date range picker — shown only when period === "range" */}
         {period === "range" && (
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
             <Popover>
               <PopoverTrigger asChild>
                 <button
@@ -425,6 +439,23 @@ export default function DashboardPage() {
                 />
               </PopoverContent>
             </Popover>
+            <button
+              onClick={handleRangeFetch}
+              disabled={!dateRange?.from || !dateRange?.to || rangeFetching}
+              style={{
+                height: 36, padding: "0 16px",
+                borderRadius: 8, border: "none",
+                background: dateRange?.from && dateRange?.to ? T.blue : T.slate,
+                color: dateRange?.from && dateRange?.to ? "#fff" : T.mutedLight,
+                fontSize: 13, fontWeight: 600,
+                cursor: dateRange?.from && dateRange?.to ? "pointer" : "default",
+                fontFamily: "var(--font-poppins)",
+                opacity: rangeFetching ? 0.6 : 1,
+                transition: "opacity 0.15s",
+              }}
+            >
+              {rangeFetching ? "Cargando..." : "Consultar"}
+            </button>
           </div>
         )}
 

@@ -5,6 +5,7 @@ import {
   updateDoc,
   query,
   orderBy,
+  limit,
   where,
   addDoc,
   Timestamp,
@@ -59,7 +60,7 @@ export function getOrderLabel(order: Order): string {
   return "Pedido";
 }
 
-export async function getOrders(from?: Date, to?: Date): Promise<Order[]> {
+export async function getOrders(from?: Date, to?: Date, limitCount?: number): Promise<Order[]> {
   let q = query(collection(db, "orders"), orderBy("timestamp", "desc"));
   if (from) q = query(q, where("timestamp", ">=", Timestamp.fromDate(from)));
   if (to) {
@@ -67,6 +68,7 @@ export async function getOrders(from?: Date, to?: Date): Promise<Order[]> {
     toEnd.setDate(toEnd.getDate() + 1);
     q = query(q, where("timestamp", "<", Timestamp.fromDate(toEnd)));
   }
+  if (limitCount) q = query(q, limit(limitCount));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Order));
 }

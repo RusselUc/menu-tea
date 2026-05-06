@@ -16,6 +16,8 @@ Menu interactivo para **Té Sueño**, una tienda de bubble tea. Los clientes pue
 - **Supabase Storage** — imagenes de productos (bucket `menu`, ruta `{itemId}/{category}.{ext}`)
 - **Leaflet / react-leaflet** — mapa en la pantalla de entrega
 - **Radix UI** (checkbox, dialog, label, slot) + **Vaul** (drawer/modal con animaciones)
+- **shadcn/ui** (new-york style) — calendar, popover, button; config en `components.json`
+- **react-day-picker** + **date-fns** — date range picker en el dashboard admin
 - **Lucide React** — iconos
 
 ## Comandos
@@ -38,7 +40,8 @@ src/
 │   │   ├── page.tsx                      # Login admin (PIN)
 │   │   ├── actions.ts                    # Server action: validateAdminPin()
 │   │   └── (panel)/
-│   │       ├── layout.tsx                # Layout del panel (requiere sesion)
+│   │       ├── layout.tsx                # Layout del panel (requiere sesion) — sidebar con logo
+│   │       ├── dashboard/page.tsx        # Metricas y pedidos con filtro por periodo/rango
 │   │       ├── menu/page.tsx             # Gestion de productos, precios y toppings
 │   │       └── loyalty/page.tsx          # Gestion de tarjetas de fidelidad
 │   ├── api/
@@ -60,6 +63,7 @@ src/
     ├── supabase.ts                       # Cliente Supabase + uploadMenuImageSupabase()
     ├── menu-items.ts                     # CRUD Firestore: menu_items, price_rules, toppings
     ├── loyalty.ts                        # Operaciones Firestore para tarjetas de fidelidad
+    ├── orders.ts                         # CRUD Firestore: orders — getOrders(from?, to?), saveFullOrder, updateOrderStatus
     └── utils.ts                          # Utilidades (cn, etc.)
 ```
 
@@ -283,6 +287,16 @@ Protegido por PIN via server action (`actions.ts` → `validateAdminPin()`). El 
 - **Precios**: editar las reglas de precio por tier/tamano (`settings/price_rules`)
 - **Toppings**: editar grupos y items, activar/desactivar por topping (`settings/toppings`)
 - Boton "Importar del codigo" para hacer seed inicial desde `menu.ts` (solo si la coleccion esta vacia)
+
+### `/admin/(panel)/dashboard` — Metricas
+
+- Filtros de periodo: Hoy, Semana, Mes, Todo, Rango (date range picker con shadcn Calendar)
+- Cards: pedidos, ingresos, pendientes, cancelados — todos filtrados por el periodo activo
+- Grafico de barras por dia/semana/mes segun el periodo
+- Top 5 bebidas mas pedidas en el periodo
+- Lista de pedidos con acciones (Entregado / Cancelar / Revertir)
+- `getOrders(from?, to?)` filtra en Firestore sin limite hardcodeado; re-fetchea al cambiar periodo
+- El sidebar usa `logo-pink.png` en lugar de texto
 
 ### `/admin/(panel)/loyalty` — Tarjetas de fidelidad
 
