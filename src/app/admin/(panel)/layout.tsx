@@ -2,11 +2,12 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { BarChart2, Heart, UtensilsCrossed } from "lucide-react";
+import { BarChart2, Heart, UtensilsCrossed, Receipt } from "lucide-react";
 import logoPink from "@/assets/images/logo-pink.png";
 
 const NAV = [
   { href: "/admin/dashboard", label: "Métricas", icon: BarChart2 },
+  { href: "/admin/gastos", label: "Gastos", icon: Receipt },
   { href: "/admin/loyalty", label: "Fidelidad", icon: Heart },
   { href: "/admin/menu", label: "Menú", icon: UtensilsCrossed },
 ];

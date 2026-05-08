@@ -14,6 +14,7 @@ import {
   Order,
   OrderStatus,
 } from "@/lib/orders";
+import { getExpenses, Expense } from "@/lib/expenses";
 
 // ── Tokens ─────────────────────────────────────────────
 const T = {
@@ -79,14 +80,13 @@ function getDateBounds(period: Period, dateRange?: DateRange): { from?: Date; to
   if (period === "week")  { const d = new Date(today); d.setDate(d.getDate() - 6); return { from: d }; }
   if (period === "month") { const d = new Date(today); d.setDate(d.getDate() - 29); return { from: d }; }
   if (period === "range") return { from: dateRange?.from, to: dateRange?.to };
-  return { limitCount: ALL_LIMIT }; // "all" — limit para evitar traer toda la coleccion
+  return { limitCount: ALL_LIMIT };
 }
 
 function computeStats(orders: Order[], period: Period, dateRange?: DateRange) {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  // Orders already come date-filtered from Firestore
   const allActive = orders.filter((o) => o.status !== "cancelled");
   const periodDelivered = orders.filter((o) => o.status === "delivered");
   const periodCancelled = orders.filter((o) => o.status === "cancelled");
@@ -96,7 +96,6 @@ function computeStats(orders: Order[], period: Period, dateRange?: DateRange) {
   const pending   = orders.filter((o) => o.status === "pending" || o.status === "success").length;
   const cancelled = periodCancelled.length;
 
-  // ── Chart data ──
   const todayLabel = todayStart
     .toLocaleDateString("es-MX", { weekday: "short" })
     .slice(0, 3)
@@ -110,7 +109,6 @@ function computeStats(orders: Order[], period: Period, dateRange?: DateRange) {
     const diffDays = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
 
     if (diffDays <= 31) {
-      // Daily bars
       chartData = Array.from({ length: diffDays }, (_, i) => {
         const day = new Date(from); day.setDate(day.getDate() + i);
         const next = new Date(day); next.setDate(next.getDate() + 1);
@@ -118,8 +116,7 @@ function computeStats(orders: Order[], period: Period, dateRange?: DateRange) {
         const label = day.toLocaleDateString("es-MX", { day: "numeric", month: "short" })
           .replace(" de ", "/").slice(0, 5);
         return {
-          label,
-          isToday,
+          label, isToday,
           count: allActive.filter((o) => {
             const od = o.timestamp?.toDate();
             return od && od >= day && od < next;
@@ -127,7 +124,6 @@ function computeStats(orders: Order[], period: Period, dateRange?: DateRange) {
         };
       });
     } else {
-      // Weekly bars (up to ~12 weeks)
       const weeks = Math.ceil(diffDays / 7);
       chartData = Array.from({ length: weeks }, (_, i) => {
         const wStart = new Date(from); wStart.setDate(wStart.getDate() + i * 7);
@@ -136,8 +132,7 @@ function computeStats(orders: Order[], period: Period, dateRange?: DateRange) {
           .replace(" de ", "/").slice(0, 5);
         const isToday = todayStart >= wStart && todayStart < wEnd;
         return {
-          label,
-          isToday,
+          label, isToday,
           count: allActive.filter((o) => {
             const od = o.timestamp?.toDate();
             return od && od >= wStart && od < wEnd;
@@ -146,7 +141,6 @@ function computeStats(orders: Order[], period: Period, dateRange?: DateRange) {
       });
     }
   } else if (period === "today" || period === "week") {
-    // 7 days
     chartData = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(todayStart);
       d.setDate(d.getDate() - (6 - i));
@@ -162,7 +156,6 @@ function computeStats(orders: Order[], period: Period, dateRange?: DateRange) {
       };
     });
   } else if (period === "month") {
-    // Last 5 weeks
     chartData = Array.from({ length: 5 }, (_, i) => {
       const wEnd = new Date(todayStart); wEnd.setDate(wEnd.getDate() - i * 7 + 1);
       const wStart = new Date(wEnd); wStart.setDate(wStart.getDate() - 7);
@@ -176,7 +169,6 @@ function computeStats(orders: Order[], period: Period, dateRange?: DateRange) {
       };
     }).reverse();
   } else {
-    // Last 12 months
     chartData = Array.from({ length: 12 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
       const next = new Date(d.getFullYear(), d.getMonth() + 1, 1);
@@ -191,7 +183,6 @@ function computeStats(orders: Order[], period: Period, dateRange?: DateRange) {
     });
   }
 
-  // ── Top flavors ──
   const flavors: Record<string, number> = {};
   allActive.forEach((o) => {
     if (o.items) o.items.forEach((i) => { flavors[i.flavor] = (flavors[i.flavor] || 0) + i.quantity; });
@@ -204,10 +195,11 @@ function computeStats(orders: Order[], period: Period, dateRange?: DateRange) {
 
 // ── Sub-components ──────────────────────────────────────
 function StatCard({
-  label, value, sub, loading,
+  label, value, sub, loading, highlight,
 }: {
-  label: string; value: string; sub: string; loading: boolean;
+  label: string; value: string; sub: string; loading: boolean; highlight?: "green" | "red";
 }) {
+  const valueColor = loading ? T.mutedLight : highlight === "green" ? T.green : highlight === "red" ? T.red : T.text;
   return (
     <div style={{
       background: T.white,
@@ -222,7 +214,7 @@ function StatCard({
         margin: 0,
         fontSize: loading ? 24 : 32,
         fontWeight: 700,
-        color: loading ? T.mutedLight : T.text,
+        color: valueColor,
         letterSpacing: "-0.03em",
         lineHeight: 1,
       }}>
@@ -273,42 +265,58 @@ export default function DashboardPage() {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     return { from: today, to: today };
   });
-
   const [rangeFetching, setRangeFetching] = useState(false);
 
-  // Auto-fetch para periodos fijos (today/week/month/all)
+  // Expenses state
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loadingExp, setLoadingExp] = useState(true);
+
+  async function fetchAll(bounds: { from?: Date; to?: Date; limitCount?: number }) {
+    const [o, e] = await Promise.all([
+      getOrders(bounds.from, bounds.to, bounds.limitCount),
+      getExpenses(bounds.from, bounds.to, bounds.limitCount),
+    ]);
+    return { orders: o, expenses: e };
+  }
+
+  // Auto-fetch para periodos fijos
   useEffect(() => {
     if (period === "range") {
-      setOrders([]); // limpiar al entrar al modo rango
+      setOrders([]);
+      setExpenses([]);
       setLoading(false);
+      setLoadingExp(false);
       return;
     }
     let active = true;
     const bounds = getDateBounds(period, dateRange);
-    getOrders(bounds.from, bounds.to, bounds.limitCount).then((o) => {
+    fetchAll(bounds).then(({ orders: o, expenses: e }) => {
       if (!active) return;
       setOrders(o);
+      setExpenses(e);
       setLoading(false);
+      setLoadingExp(false);
     });
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
-  // Fetch manual para rango — llamado por el botón "Consultar"
   async function handleRangeFetch() {
     if (!dateRange?.from || !dateRange?.to) return;
     setRangeFetching(true);
     const bounds = getDateBounds("range", dateRange);
-    const o = await getOrders(bounds.from, bounds.to);
+    const { orders: o, expenses: e } = await fetchAll(bounds);
     setOrders(o);
+    setExpenses(e);
     setRangeFetching(false);
   }
 
   async function handleRefresh() {
     setRefreshing(true);
     const bounds = getDateBounds(period, dateRange);
-    const o = await getOrders(bounds.from, bounds.to, bounds.limitCount);
+    const { orders: o, expenses: e } = await fetchAll(bounds);
     setOrders(o);
+    setExpenses(e);
     setRefreshing(false);
   }
 
@@ -323,6 +331,9 @@ export default function DashboardPage() {
     computeStats(orders, period, dateRange);
   const topFlavorMax = topFlavors[0]?.[1] || 1;
 
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+  const netRevenue = revenue - totalExpenses;
+
   const periodLabel = period === "range"
     ? dateRange?.from
       ? dateRange.to && dateRange.to.toDateString() !== dateRange.from.toDateString()
@@ -330,19 +341,29 @@ export default function DashboardPage() {
         : format(dateRange.from, "d 'de' MMMM", { locale: es })
       : "rango seleccionado"
     : ({ today: "hoy", week: "esta semana", month: "este mes", all: "en total" } as Record<string, string>)[period];
+
   const todayStr = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
   const displayOrders = periodOrders.slice().sort(
     (a, b) => (b.timestamp?.toDate().getTime() ?? 0) - (a.timestamp?.toDate().getTime() ?? 0)
   ).slice(0, 40);
 
+  const cardExpenses = expenses.filter((e) => e.paymentMethod === "card");
+  const pendingCardTotal = cardExpenses.filter((e) => !e.cardPaid).reduce((s, e) => s + e.amount, 0);
+  const pendingCardCount = cardExpenses.filter((e) => !e.cardPaid).length;
+
   return (
     <>
       <style>{`
-        .dash-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .dash-mid   { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        .dash-stats  { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .dash-fin    { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .dash-mid    { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        .period-tabs { display: flex; gap: 4; background: #F1F5F9; border-radius: 10px; padding: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; width: 100%; }
+        .period-tabs::-webkit-scrollbar { display: none; }
         @media (min-width: 768px) {
-          .dash-stats { grid-template-columns: repeat(4, 1fr); }
-          .dash-mid   { grid-template-columns: 3fr 2fr; }
+          .dash-stats  { grid-template-columns: repeat(4, 1fr); }
+          .dash-fin    { grid-template-columns: repeat(3, 1fr); }
+          .dash-mid    { grid-template-columns: 3fr 2fr; }
+          .period-tabs { width: fit-content; }
         }
       `}</style>
 
@@ -375,12 +396,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Period filter tabs */}
-        <div style={{
-          display: "flex", gap: 4,
-          background: T.slate, borderRadius: 10,
-          padding: 4, marginBottom: 20,
-          width: "fit-content",
-        }}>
+        <div className="period-tabs" style={{ marginBottom: 20 }}>
           {PERIODS.map(({ id, label }) => (
             <button
               key={id}
@@ -402,7 +418,7 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Date range picker — shown only when period === "range" */}
+        {/* Date range picker */}
         {period === "range" && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
             <Popover>
@@ -459,12 +475,37 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Stat cards */}
-        <div className="dash-stats" style={{ marginBottom: 16 }}>
+        {/* Stat cards — pedidos */}
+        <div className="dash-stats" style={{ marginBottom: 12 }}>
           <StatCard label="Pedidos"    value={String(count)}     sub={`no cancelados ${periodLabel}`} loading={loading} />
           <StatCard label="Ingresos"   value={`$${revenue}`}     sub={`entregados ${periodLabel}`}    loading={loading} />
           <StatCard label="Pendientes" value={String(pending)}   sub="requieren acción ahora"         loading={loading} />
           <StatCard label="Cancelados" value={String(cancelled)} sub={periodLabel}                    loading={loading} />
+        </div>
+
+        {/* Financial summary — gastos y ganancia neta */}
+        <div className="dash-fin" style={{ marginBottom: 16 }}>
+          <StatCard
+            label="Gastos"
+            value={`$${totalExpenses}`}
+            sub={`${expenses.length} registro${expenses.length !== 1 ? "s" : ""} ${periodLabel}`}
+            loading={loadingExp}
+            highlight={totalExpenses > 0 ? "red" : undefined}
+          />
+          <StatCard
+            label="TDC por pagar"
+            value={pendingCardTotal > 0 ? `$${pendingCardTotal}` : "—"}
+            sub={pendingCardTotal > 0 ? `${pendingCardCount} cargo${pendingCardCount !== 1 ? "s" : ""} pendiente${pendingCardCount !== 1 ? "s" : ""}` : "sin cargos pendientes"}
+            loading={loadingExp}
+            highlight={pendingCardTotal > 0 ? "red" : undefined}
+          />
+          <StatCard
+            label="Ganancia neta"
+            value={`$${netRevenue}`}
+            sub={`ingresos menos gastos ${periodLabel}`}
+            loading={loading || loadingExp}
+            highlight={netRevenue >= 0 ? "green" : "red"}
+          />
         </div>
 
         {/* Mid section */}
@@ -597,6 +638,7 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+
       </div>
     </>
   );

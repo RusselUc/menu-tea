@@ -290,13 +290,19 @@ Protegido por PIN via server action (`actions.ts` → `validateAdminPin()`). El 
 
 ### `/admin/(panel)/dashboard` — Metricas
 
-- Filtros de periodo: Hoy, Semana, Mes, Todo, Rango (date range picker con shadcn Calendar)
+- Filtros de periodo: Hoy, Semana, Mes, Todo, Rango
 - Cards: pedidos, ingresos, pendientes, cancelados — todos filtrados por el periodo activo
 - Grafico de barras por dia/semana/mes segun el periodo
 - Top 5 bebidas mas pedidas en el periodo
 - Lista de pedidos con acciones (Entregado / Cancelar / Revertir)
-- `getOrders(from?, to?)` filtra en Firestore sin limite hardcodeado; re-fetchea al cambiar periodo
 - El sidebar usa `logo-pink.png` en lugar de texto
+
+#### Logica de fetch
+
+- Periodos fijos (Hoy/Semana/Mes/Todo) → fetch automatico al cambiar de tab
+- **Rango** → fetch manual: el usuario elige fechas con el date range picker (shadcn Calendar) y presiona "Consultar". No se lanza ninguna query hasta entonces
+- "Todo" usa `limit(500)` en Firestore para evitar traer toda la coleccion
+- `getOrders(from?, to?, limitCount?)` en `src/lib/orders.ts` — filtra por `timestamp` con `where` en Firestore
 
 ### `/admin/(panel)/loyalty` — Tarjetas de fidelidad
 
@@ -315,6 +321,10 @@ Boton en el menu publico que abre un bottom sheet con una bebida aleatoria pre-a
 - `pickRandom(activeFlavors, categories, toppingGroups)` — elige categoria aleatoria → sabor en esa categoria → 1 topping activo
 - `SurpriseDrawer` — bottom sheet que muestra la tarjeta del producto con imagen hero + chips de categoria y topping superpuestos, selector de tamano y botones "Agregar al carrito" / "Otra opcion"
 - El precio es el precio base del tamano elegido (1 topping siempre gratis)
+
+## Roadmap / futuro
+
+- **Comidas y postres**: en el futuro el menu podria incluir categorias no-bebida. Las categorias, imagenes y precios ya soportan esto estructuralmente. Lo que requiere trabajo es generalizar el concepto de "tamano" (`mediano/grande/pandi`) a "variante" en `BottomProduct.tsx` y en el schema de Firestore, para que aplique a cualquier tipo de producto. No tocar hasta que sea necesario.
 
 ## Notas de desarrollo
 

@@ -232,6 +232,15 @@ export default function MenuPage() {
 
   return (
     <div style={{ padding: "28px 24px 48px", maxWidth: 720, margin: "0 auto", fontFamily: "var(--font-poppins)" }}>
+      <style>{`
+        .menu-header { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
+        .menu-header-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        @media (min-width: 640px) {
+          .menu-header { flex-direction: row; justify-content: space-between; align-items: flex-start; }
+          .menu-header-actions { flex-wrap: nowrap; }
+        }
+      `}</style>
+
       {/* Toast */}
       {toast && (
         <div style={{
@@ -246,7 +255,7 @@ export default function MenuPage() {
       )}
 
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, gap: 12 }}>
+      <div className="menu-header">
         <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: T.text, letterSpacing: "-0.02em" }}>
             Menú
@@ -257,7 +266,7 @@ export default function MenuPage() {
               : "Gestiona los productos del menú"}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+        <div className="menu-header-actions">
           {items.length === 0 && !loading && (
             <button
               onClick={handleSeed}
