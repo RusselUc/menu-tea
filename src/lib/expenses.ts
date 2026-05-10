@@ -20,11 +20,15 @@ export interface Expense {
   description: string;
   amount: number;
   paymentMethod: PaymentMethod;
-  cardDueDate?: Timestamp;
+  cardName?: string;           // nombre de la tarjeta (ej. "BBVA", "Banamex")
+  cardDueDay?: number;         // día del mes en que se paga (ej. 15)
+  cardDueDate?: Timestamp;     // legacy: fecha específica de pago
   cardPaid?: boolean;
   // meses sin intereses
   installments?: number;       // total de meses (si aplica)
-  installmentsPaid?: number;   // cuántos meses se han pagado
+  firstPaymentMonth?: string;  // mes de primer pago "YYYY-MM" (ej. "2026-06")
+  installmentsPaid?: number;   // legacy: contador simple
+  paidMonths?: string[];       // meses pagados como "YYYY-MM" (ej. ["2026-05", "2026-06"])
   timestamp: Timestamp;
 }
 
@@ -51,6 +55,14 @@ export async function updateExpenseCardPaid(id: string, cardPaid: boolean): Prom
 
 export async function updateExpenseInstallmentPaid(id: string, installmentsPaid: number, cardPaid: boolean): Promise<void> {
   await updateDoc(doc(db, "expenses", id), { installmentsPaid, cardPaid });
+}
+
+export async function updateExpensePaidMonths(id: string, paidMonths: string[], cardPaid: boolean): Promise<void> {
+  await updateDoc(doc(db, "expenses", id), { paidMonths, installmentsPaid: paidMonths.length, cardPaid });
+}
+
+export async function updateExpense(id: string, data: Partial<Omit<Expense, "id">>): Promise<void> {
+  await updateDoc(doc(db, "expenses", id), data as Record<string, unknown>);
 }
 
 export async function deleteExpense(id: string): Promise<void> {

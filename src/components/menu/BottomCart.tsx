@@ -2,7 +2,7 @@ import { FC, useState } from "react";
 import { CartItem } from ".";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../ui/drawer";
 import { MessageCircle, Trash2 } from "lucide-react";
-import { saveFullOrder } from "@/lib/orders";
+import { saveFullOrder, getNextOrderNumber } from "@/lib/orders";
 import { normalizePhone } from "@/lib/loyalty";
 
 const C = {
@@ -60,8 +60,9 @@ const BottomCart: FC<BottomCartProps> = ({
     return encodeURIComponent(msg);
   };
 
-  const handleWhatsAppOrder = () => {
+  const handleWhatsAppOrder = async () => {
     const normalized = normalizePhone(loyaltyPhone);
+    const orderNumber = await getNextOrderNumber().catch(() => undefined);
     saveFullOrder({
       items: items.map((item) => ({
         flavor: item.name,
@@ -72,6 +73,8 @@ const BottomCart: FC<BottomCartProps> = ({
         quantity: item.quantity,
       })),
       total,
+      source: "whatsapp",
+      ...(orderNumber ? { orderNumber } : {}),
       ...(normalized.length >= 10 ? { phone: normalized } : {}),
     }).catch(console.error);
 

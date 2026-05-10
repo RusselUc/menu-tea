@@ -8,11 +8,12 @@ import {
   limit,
   where,
   addDoc,
+  onSnapshot,
   Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-export type OrderStatus = "pending" | "delivered" | "cancelled" | "success";
+export type OrderStatus = "pending" | "delivered" | "cancelled" | "success" | "ready";
 
 export interface OrderItem {
   flavor: string;
@@ -36,6 +37,9 @@ export interface Order {
   toppings?: string[];
   price?: number;
   quantity?: number;
+  // comanda
+  orderNumber?: number;
+  source?: "whatsapp" | "comanda";
   // common
   timestamp: Timestamp;
   status: OrderStatus;
@@ -89,10 +93,42 @@ export async function updateOrderStatus(
   await updateDoc(doc(db, "orders", orderId), { status });
 }
 
+export async function getNextOrderNumber(): Promise<number> {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const q = query(
+    collection(db, "orders"),
+    where("timestamp", ">=", Timestamp.fromDate(todayStart)),
+    orderBy("timestamp", "asc")
+  );
+  const snap = await getDocs(q);
+  let max = 0;
+  snap.docs.forEach((d) => {
+    const n = d.data().orderNumber;
+    if (typeof n === "number" && n > max) max = n;
+  });
+  return max + 1;
+}
+
+export function subscribeToCommandaOrders(callback: (orders: Order[]) => void): () => void {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const q = query(
+    collection(db, "orders"),
+    where("timestamp", ">=", Timestamp.fromDate(todayStart)),
+    orderBy("timestamp", "desc")
+  );
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Order)));
+  });
+}
+
 export async function saveFullOrder(order: {
   items: OrderItem[];
   total: number;
   phone?: string;
+  orderNumber?: number;
+  source?: "whatsapp" | "comanda";
 }): Promise<void> {
   await addDoc(collection(db, "orders"), {
     ...order,

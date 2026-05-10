@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import {
   Plus, Trash2, CreditCard, Banknote, CalendarIcon, RefreshCw,
-  TrendingDown, Clock, CheckCircle2,
+  TrendingDown, Clock, CheckCircle2, Pencil,
 } from "lucide-react";
 import { type DateRange } from "react-day-picker";
 import { format } from "date-fns";
@@ -12,8 +12,9 @@ import { Calendar } from "@/components/ui/calendar";
 import {
   getExpenses,
   addExpense,
+  updateExpense,
   updateExpenseCardPaid,
-  updateExpenseInstallmentPaid,
+  updateExpensePaidMonths,
   deleteExpense,
   Expense,
   PaymentMethod,
@@ -78,29 +79,85 @@ function formatDate(ts: { toDate: () => Date }): string {
   return ts.toDate().toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
 }
 
-// ── Add form ──────────────────────────────────────────────
+// ── Form types & helpers ──────────────────────────────────
 const INSTALLMENT_OPTIONS = [3, 6, 9, 12, 18, 24];
+const CARD_OPTIONS = ["BBVA", "Banamex", "Santander", "HSBC", "Banorte", "Amex"];
+
+function defaultFirstPaymentMonth(dueDay: number): string {
+  const now = new Date();
+  // Si el día de pago ya pasó este mes, el primer pago es el mes siguiente
+  const d = now.getDate() >= dueDay
+    ? new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    : new Date(now.getFullYear(), now.getMonth(), 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 const EMPTY = {
   description: "", amount: "", paymentMethod: "cash" as PaymentMethod,
-  cardDueDate: "", date: todayDateString(),
+  cardName: "", cardDueDay: "15", date: todayDateString(),
   useInstallments: false, installments: "12",
+  firstPaymentMonth: defaultFirstPaymentMonth(15),
 };
 
-function AddExpenseForm({ onSave, onCancel }: {
-  onSave: (form: typeof EMPTY) => Promise<void>;
-  onCancel: () => void;
-}) {
-  const [form, setForm] = useState(EMPTY);
-  const [saving, setSaving] = useState(false);
+type ExpenseForm = typeof EMPTY;
 
-  const inputStyle = {
+function expenseToForm(exp: Expense): ExpenseForm {
+  const d = exp.timestamp?.toDate();
+  const dateStr = d
+    ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    : todayDateString();
+  const dueDay = exp.cardDueDay
+    ? String(exp.cardDueDay)
+    : exp.cardDueDate
+      ? String(exp.cardDueDate.toDate().getDate())
+      : "15";
+  const firstPaymentMonth = exp.firstPaymentMonth
+    ?? defaultFirstPaymentMonth(parseInt(dueDay));
+  return {
+    description: exp.description,
+    amount: String(exp.amount),
+    paymentMethod: exp.paymentMethod,
+    cardName: exp.cardName ?? "",
+    cardDueDay: dueDay,
+    date: dateStr,
+    useInstallments: !!(exp.installments && exp.installments > 1),
+    installments: exp.installments ? String(exp.installments) : "12",
+    firstPaymentMonth,
+  };
+}
+
+// Calcula la próxima fecha de pago dado el día del mes
+function getNextDueDate(dueDay: number): Date {
+  const now = new Date();
+  const thisMonth = new Date(now.getFullYear(), now.getMonth(), dueDay);
+  return thisMonth > now ? thisMonth : new Date(now.getFullYear(), now.getMonth() + 1, dueDay);
+}
+
+// Genera los meses de pago dado el mes inicial "YYYY-MM", N meses y el día de pago
+function getInstallmentMonths(firstPaymentMonth: string, installments: number, dueDay: number): { key: string; label: string; date: Date }[] {
+  const [year, month] = firstPaymentMonth.split("-").map(Number);
+  return Array.from({ length: installments }, (_, i) => {
+    const d = new Date(year, month - 1 + i, dueDay);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = d.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+    return { key, label, date: d };
+  });
+}
+
+function ExpenseFormFields({ form, setForm, saving, onCancel, submitLabel }: {
+  form: ExpenseForm;
+  setForm: React.Dispatch<React.SetStateAction<ExpenseForm>>;
+  saving: boolean;
+  onCancel: () => void;
+  submitLabel: string;
+}) {
+  const inputStyle: React.CSSProperties = {
     height: 40, padding: "0 13px",
     borderRadius: 8, border: `1px solid ${T.border}`,
     background: T.white, fontSize: 13,
     fontFamily: "var(--font-poppins)", color: T.text,
     outline: "none", width: "100%",
   };
-
   const labelStyle: React.CSSProperties = {
     fontSize: 11, fontWeight: 600, color: T.muted,
     textTransform: "uppercase", letterSpacing: "0.06em",
@@ -110,21 +167,18 @@ function AddExpenseForm({ onSave, onCancel }: {
     ? (parseFloat(form.amount) / parseInt(form.installments)).toFixed(2)
     : null;
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.description.trim() || !form.amount) return;
-    setSaving(true);
-    await onSave(form);
-    setSaving(false);
-  }
+  const nextDue = form.paymentMethod === "card" && form.cardDueDay
+    ? getNextDueDate(parseInt(form.cardDueDay))
+    : null;
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <>
       {/* Fecha + Monto */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           <label style={labelStyle}>Fecha del gasto</label>
-          <input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+          <input type="date" value={form.date}
+            onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
             required max={todayDateString()} style={inputStyle} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -149,7 +203,7 @@ function AddExpenseForm({ onSave, onCancel }: {
         <div style={{ display: "flex", background: T.slate, borderRadius: 8, padding: 3, gap: 2, width: "fit-content" }}>
           {(["cash", "card"] as PaymentMethod[]).map((m) => (
             <button key={m} type="button"
-              onClick={() => setForm((f) => ({ ...f, paymentMethod: m, cardDueDate: "", useInstallments: false }))}
+              onClick={() => setForm((f) => ({ ...f, paymentMethod: m, useInstallments: false }))}
               style={{
                 display: "flex", alignItems: "center", gap: 6,
                 height: 34, padding: "0 16px", borderRadius: 6, border: "none",
@@ -172,12 +226,80 @@ function AddExpenseForm({ onSave, onCancel }: {
       {form.paymentMethod === "card" && (
         <div style={{
           background: T.purpleBg, border: `1px solid ${T.purpleBorder}`,
-          borderRadius: 10, padding: "14px 16px",
+          borderRadius: 10, padding: "16px",
           display: "flex", flexDirection: "column", gap: 14,
         }}>
+          {/* Nombre de tarjeta */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ ...labelStyle, color: T.purple }}>Tarjeta</label>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {CARD_OPTIONS.map((c) => (
+                <button key={c} type="button"
+                  onClick={() => setForm((f) => ({ ...f, cardName: f.cardName === c ? "" : c }))}
+                  style={{
+                    height: 30, padding: "0 12px", borderRadius: 100,
+                    border: `1px solid ${form.cardName === c ? T.purple : T.purpleBorder}`,
+                    background: form.cardName === c ? T.purple : T.white,
+                    color: form.cardName === c ? T.white : T.purple,
+                    fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    fontFamily: "var(--font-poppins)", transition: "all 0.12s",
+                  }}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+            <input
+              placeholder="Otra (escribe el nombre)"
+              value={CARD_OPTIONS.includes(form.cardName) ? "" : form.cardName}
+              onChange={(e) => setForm((f) => ({ ...f, cardName: e.target.value }))}
+              style={{ ...inputStyle, borderColor: T.purpleBorder, fontSize: 12 }}
+            />
+          </div>
+
+          {/* Día de pago mensual */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ ...labelStyle, color: T.purple }}>Día de pago cada mes</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <input
+                type="number" min={1} max={31}
+                value={form.cardDueDay}
+                onChange={(e) => setForm((f) => ({ ...f, cardDueDay: e.target.value }))}
+                style={{ ...inputStyle, width: 80, borderColor: T.purpleBorder }}
+              />
+              {nextDue && (
+                <span style={{ fontSize: 12, color: T.purple }}>
+                  Próximo pago: <strong>{nextDue.toLocaleDateString("es-MX", { day: "numeric", month: "long" })}</strong>
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Mes de primer pago */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ ...labelStyle, color: T.purple }}>Mes de primer pago</label>
+            <input
+              type="month"
+              value={form.firstPaymentMonth}
+              onChange={(e) => setForm((f) => ({ ...f, firstPaymentMonth: e.target.value }))}
+              min={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`}
+              style={{ ...inputStyle, width: "auto", borderColor: T.purpleBorder }}
+            />
+            {form.firstPaymentMonth && form.cardDueDay && (
+              <p style={{ margin: 0, fontSize: 12, color: T.purple }}>
+                Primer pago: <strong>
+                  {new Date(
+                    parseInt(form.firstPaymentMonth.split("-")[0]),
+                    parseInt(form.firstPaymentMonth.split("-")[1]) - 1,
+                    parseInt(form.cardDueDay)
+                  ).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}
+                </strong>
+              </p>
+            )}
+          </div>
+
           {/* Toggle meses sin intereses */}
-          <button
-            type="button"
+          <button type="button"
             onClick={() => setForm((f) => ({ ...f, useInstallments: !f.useInstallments }))}
             style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -185,10 +307,7 @@ function AddExpenseForm({ onSave, onCancel }: {
               fontFamily: "var(--font-poppins)",
             }}
           >
-            <span style={{ fontSize: 13, fontWeight: 600, color: T.purple }}>
-              Meses sin intereses
-            </span>
-            {/* Toggle pill */}
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.purple }}>Meses sin intereses</span>
             <div style={{
               width: 36, height: 20, borderRadius: 10,
               background: form.useInstallments ? T.purple : T.slateBorder,
@@ -206,45 +325,35 @@ function AddExpenseForm({ onSave, onCancel }: {
 
           {form.useInstallments && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {/* Opciones rápidas */}
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ ...labelStyle, color: T.purple }}>Número de meses</label>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {INSTALLMENT_OPTIONS.map((m) => (
-                    <button
-                      key={m}
-                      type="button"
+                    <button key={m} type="button"
                       onClick={() => setForm((f) => ({ ...f, installments: String(m) }))}
                       style={{
                         height: 32, padding: "0 14px", borderRadius: 7,
                         border: `1px solid ${form.installments === String(m) ? T.purple : T.purpleBorder}`,
                         background: form.installments === String(m) ? T.purple : T.white,
                         color: form.installments === String(m) ? T.white : T.purple,
-                        fontSize: 12, fontWeight: 600,
-                        cursor: "pointer", fontFamily: "var(--font-poppins)",
-                        transition: "all 0.12s",
+                        fontSize: 12, fontWeight: 600, cursor: "pointer",
+                        fontFamily: "var(--font-poppins)", transition: "all 0.12s",
                       }}
                     >
                       {m}
                     </button>
                   ))}
-                  <input
-                    type="number"
-                    placeholder="Otro"
-                    min={2}
+                  <input type="number" placeholder="Otro" min={2}
                     value={INSTALLMENT_OPTIONS.includes(parseInt(form.installments)) ? "" : form.installments}
                     onChange={(e) => setForm((f) => ({ ...f, installments: e.target.value }))}
                     style={{
                       height: 32, width: 68, padding: "0 10px", borderRadius: 7,
                       border: `1px solid ${T.purpleBorder}`, background: T.white,
-                      fontSize: 12, fontFamily: "var(--font-poppins)", color: T.purple,
-                      outline: "none",
+                      fontSize: 12, fontFamily: "var(--font-poppins)", color: T.purple, outline: "none",
                     }}
                   />
                 </div>
               </div>
-
-              {/* Mensualidad calculada */}
               {monthlyAmount && (
                 <div style={{
                   background: T.white, borderRadius: 8, padding: "10px 14px",
@@ -252,23 +361,11 @@ function AddExpenseForm({ onSave, onCancel }: {
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                 }}>
                   <span style={{ fontSize: 12, color: T.muted }}>Mensualidad aprox.</span>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: T.purple }}>
-                    ${monthlyAmount} / mes
-                  </span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: T.purple }}>${monthlyAmount} / mes</span>
                 </div>
               )}
             </div>
           )}
-
-          {/* Fecha de pago */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            <label style={{ ...labelStyle, color: T.purple }}>
-              {form.useInstallments ? "Fecha de primer pago" : "Fecha de pago"}
-            </label>
-            <input type="date" value={form.cardDueDate}
-              onChange={(e) => setForm((f) => ({ ...f, cardDueDate: e.target.value }))}
-              style={{ ...inputStyle, width: "auto", borderColor: T.purpleBorder }} />
-          </div>
         </div>
       )}
 
@@ -288,9 +385,35 @@ function AddExpenseForm({ onSave, onCancel }: {
           opacity: saving || !form.description.trim() || !form.amount ? 0.5 : 1,
           transition: "opacity 0.15s",
         }}>
-          {saving ? "Guardando..." : "Guardar gasto"}
+          {saving ? "Guardando..." : submitLabel}
         </button>
       </div>
+    </>
+  );
+}
+
+function ExpenseFormWrapper({ initial, onSave, onCancel }: {
+  initial?: ExpenseForm;
+  onSave: (form: ExpenseForm) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState<ExpenseForm>(initial ?? EMPTY);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.description.trim() || !form.amount) return;
+    setSaving(true);
+    await onSave(form);
+    setSaving(false);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <ExpenseFormFields
+        form={form} setForm={setForm} saving={saving}
+        onCancel={onCancel} submitLabel={initial ? "Guardar cambios" : "Guardar gasto"}
+      />
     </form>
   );
 }
@@ -337,8 +460,10 @@ export default function GastosPage() {
   });
   const [rangeFetching, setRangeFetching] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [payingMonthId, setPayingMonthId] = useState<string | null>(null); // id del gasto con picker abierto
   const [filter, setFilter] = useState<"all" | "cash" | "card">("all");
 
   async function fetchExpenses(bounds: { from?: Date; to?: Date; limitCount?: number }) {
@@ -379,32 +504,41 @@ export default function GastosPage() {
     setRefreshing(false);
   }
 
-  async function handleSave(form: typeof EMPTY) {
+  async function handleSave(form: ExpenseForm) {
     const { Timestamp } = await import("firebase/firestore");
     const [year, month, day] = form.date.split("-").map(Number);
     const expenseDate = new Date(year, month - 1, day, 12, 0, 0);
-    const expense: Omit<Expense, "id"> = {
+
+    const data: Omit<Expense, "id"> = {
       description: form.description.trim(),
       amount: parseFloat(form.amount),
       paymentMethod: form.paymentMethod,
       timestamp: Timestamp.fromDate(expenseDate),
     };
+
     if (form.paymentMethod === "card") {
-      expense.cardPaid = false;
-      if (form.cardDueDate) {
-        const [y, m, d] = form.cardDueDate.split("-").map(Number);
-        expense.cardDueDate = Timestamp.fromDate(new Date(y, m - 1, d, 12, 0, 0));
-      }
+      data.cardName = form.cardName.trim() || undefined;
+      data.cardDueDay = parseInt(form.cardDueDay) || 15;
+      if (!editingExpense) data.cardPaid = false;
+      if (form.firstPaymentMonth) data.firstPaymentMonth = form.firstPaymentMonth;
       if (form.useInstallments && parseInt(form.installments) > 1) {
-        expense.installments = parseInt(form.installments);
-        expense.installmentsPaid = 0;
+        data.installments = parseInt(form.installments);
+        data.firstPaymentMonth = form.firstPaymentMonth;
+        if (!editingExpense) data.installmentsPaid = 0;
       }
     }
-    await addExpense(expense);
+
+    if (editingExpense) {
+      await updateExpense(editingExpense.id, data);
+      setExpenses((prev) => prev.map((e) => e.id === editingExpense.id ? { ...e, ...data, id: editingExpense.id } : e));
+      setEditingExpense(null);
+    } else {
+      await addExpense(data);
+      const bounds = getDateBounds(period, dateRange);
+      const e = await fetchExpenses(bounds);
+      setExpenses(e);
+    }
     setShowForm(false);
-    const bounds = getDateBounds(period, dateRange);
-    const e = await fetchExpenses(bounds);
-    setExpenses(e);
   }
 
   async function handleTogglePaid(exp: Expense) {
@@ -415,14 +549,17 @@ export default function GastosPage() {
     setTogglingId(null);
   }
 
-  async function handleRegisterInstallment(exp: Expense) {
+  async function handleToggleMonth(exp: Expense, monthKey: string) {
     if (!exp.installments) return;
     setTogglingId(exp.id);
-    const newPaid = (exp.installmentsPaid ?? 0) + 1;
-    const fullyPaid = newPaid >= exp.installments;
-    await updateExpenseInstallmentPaid(exp.id, newPaid, fullyPaid);
+    const current = exp.paidMonths ?? [];
+    const newPaidMonths = current.includes(monthKey)
+      ? current.filter((m) => m !== monthKey)
+      : [...current, monthKey].sort();
+    const fullyPaid = newPaidMonths.length >= exp.installments;
+    await updateExpensePaidMonths(exp.id, newPaidMonths, fullyPaid);
     setExpenses((prev) => prev.map((e) =>
-      e.id === exp.id ? { ...e, installmentsPaid: newPaid, cardPaid: fullyPaid } : e
+      e.id === exp.id ? { ...e, paidMonths: newPaidMonths, installmentsPaid: newPaidMonths.length, cardPaid: fullyPaid } : e
     ));
     setTogglingId(null);
   }
@@ -527,7 +664,7 @@ export default function GastosPage() {
         {showForm && (
           <div
             style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.4)", display: "flex", justifyContent: "flex-end" }}
-            onClick={(e) => { if (e.target === e.currentTarget) setShowForm(false); }}
+            onClick={(e) => { if (e.target === e.currentTarget) { setShowForm(false); setEditingExpense(null); } }}
           >
             <div style={{
               width: "min(480px, 100vw)", height: "100vh",
@@ -537,16 +674,20 @@ export default function GastosPage() {
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>
-                  Nuevo gasto
+                  {editingExpense ? "Editar gasto" : "Nuevo gasto"}
                 </h2>
                 <button
-                  onClick={() => setShowForm(false)}
+                  onClick={() => { setShowForm(false); setEditingExpense(null); }}
                   style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: T.muted, padding: 4 }}
                 >
                   ×
                 </button>
               </div>
-              <AddExpenseForm onSave={handleSave} onCancel={() => setShowForm(false)} />
+              <ExpenseFormWrapper
+                initial={editingExpense ? expenseToForm(editingExpense) : undefined}
+                onSave={handleSave}
+                onCancel={() => { setShowForm(false); setEditingExpense(null); }}
+              />
             </div>
           </div>
         )}
@@ -709,17 +850,27 @@ export default function GastosPage() {
             <div>
               {displayed.map((exp, idx) => {
                 const isCard = exp.paymentMethod === "card";
-                const dueDate = exp.cardDueDate?.toDate();
                 const now = new Date();
-                const isOverdue = isCard && !exp.cardPaid && dueDate && dueDate < now;
-                const isDueSoon = isCard && !exp.cardPaid && dueDate && dueDate >= now &&
-                  dueDate <= new Date(now.getTime() + 7 * 86400000);
+                // Usar cardDueDay (nuevo) o cardDueDate (legacy)
+                const nextDue = isCard && exp.cardDueDay
+                  ? getNextDueDate(exp.cardDueDay)
+                  : exp.cardDueDate?.toDate() ?? null;
+                const isOverdue = isCard && !exp.cardPaid && nextDue && nextDue < now;
+                const isDueSoon = isCard && !exp.cardPaid && nextDue && nextDue >= now &&
+                  nextDue <= new Date(now.getTime() + 7 * 86400000);
                 const isDeleting = deletingId === exp.id;
                 const isToggling = togglingId === exp.id;
                 const hasInstallments = isCard && exp.installments && exp.installments > 1;
-                const installmentsPaid = exp.installmentsPaid ?? 0;
-                const installmentsLeft = hasInstallments ? exp.installments! - installmentsPaid : 0;
+                const paidMonths = exp.paidMonths ?? (exp.installmentsPaid ? Array(exp.installmentsPaid).fill("") : []);
+                const installmentsPaidCount = paidMonths.length;
+                const installmentsLeft = hasInstallments ? exp.installments! - installmentsPaidCount : 0;
                 const monthlyAmount = hasInstallments ? exp.amount / exp.installments! : 0;
+                const firstPaymentMonth = exp.firstPaymentMonth
+                  ?? defaultFirstPaymentMonth(exp.cardDueDay ?? 15);
+                const installmentMonths = hasInstallments && exp.cardDueDay
+                  ? getInstallmentMonths(firstPaymentMonth, exp.installments!, exp.cardDueDay)
+                  : [];
+                const isPickerOpen = payingMonthId === exp.id;
 
                 const barColor = isCard
                   ? exp.cardPaid ? T.green : isOverdue ? T.red : isDueSoon ? T.amber : T.purple
@@ -761,7 +912,7 @@ export default function GastosPage() {
                           color: isCard ? T.purple : T.muted,
                           border: `1px solid ${isCard ? T.purpleBorder : T.slateBorder}`,
                         }}>
-                          {isCard ? "TDC" : "Efectivo"}
+                          {isCard ? (exp.cardName || "TDC") : "Efectivo"}
                         </span>
                         {isCard && (
                           <span style={{
@@ -780,14 +931,17 @@ export default function GastosPage() {
                             fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 100, flexShrink: 0,
                             background: T.purpleBg, color: T.purple, border: `1px solid ${T.purpleBorder}`,
                           }}>
-                            {installmentsPaid}/{exp.installments} meses
+                            {installmentsPaidCount}/{exp.installments} meses
                           </span>
                         )}
                       </div>
                       <p style={{ margin: 0, fontSize: 11.5, color: T.mutedLight }}>
                         {exp.timestamp ? formatDate(exp.timestamp) : ""}
-                        {isCard && dueDate && (
-                          <> · vence el {dueDate.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}</>
+                        {isCard && exp.cardDueDay && (
+                          <> · pago día {exp.cardDueDay} de cada mes</>
+                        )}
+                        {isCard && !exp.cardDueDay && nextDue && (
+                          <> · vence el {nextDue.toLocaleDateString("es-MX", { day: "numeric", month: "short" })}</>
                         )}
                         {hasInstallments && !exp.cardPaid && (
                           <> · siguiente: ${monthlyAmount.toFixed(0)}</>
@@ -798,10 +952,50 @@ export default function GastosPage() {
                         <div style={{ marginTop: 6, height: 4, background: T.slate, borderRadius: 2, overflow: "hidden" }}>
                           <div style={{
                             height: "100%",
-                            width: `${(installmentsPaid / exp.installments!) * 100}%`,
+                            width: `${(installmentsPaidCount / exp.installments!) * 100}%`,
                             background: exp.cardPaid ? T.green : T.purple,
                             borderRadius: 2, transition: "width 0.3s",
                           }} />
+                        </div>
+                      )}
+                      {/* Picker de meses */}
+                      {isPickerOpen && installmentMonths.length > 0 && (
+                        <div style={{
+                          marginTop: 10,
+                          background: T.white, border: `1px solid ${T.purpleBorder}`,
+                          borderRadius: 10, padding: "10px 12px",
+                          display: "flex", flexDirection: "column", gap: 4,
+                          maxHeight: 220, overflowY: "auto",
+                        }}>
+                          <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 600, color: T.purple, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                            Selecciona el mes pagado
+                          </p>
+                          {installmentMonths.map(({ key, label }) => {
+                            const isPaid = (exp.paidMonths ?? []).includes(key);
+                            return (
+                              <button
+                                key={key}
+                                type="button"
+                                onClick={() => handleToggleMonth(exp, key)}
+                                disabled={isToggling}
+                                style={{
+                                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                                  padding: "7px 10px", borderRadius: 7, border: "none",
+                                  background: isPaid ? T.greenBg : T.slate,
+                                  cursor: "pointer", fontFamily: "var(--font-poppins)",
+                                  opacity: isToggling ? 0.5 : 1,
+                                  transition: "background 0.12s",
+                                }}
+                              >
+                                <span style={{ fontSize: 12, color: isPaid ? T.green : T.secondary, fontWeight: isPaid ? 600 : 400 }}>
+                                  {label.charAt(0).toUpperCase() + label.slice(1)}
+                                </span>
+                                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: isPaid ? T.green : T.mutedLight, fontWeight: 600 }}>
+                                  {isPaid ? <><CheckCircle2 size={12} /> Pagado</> : `$${monthlyAmount.toFixed(0)}`}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -839,24 +1033,36 @@ export default function GastosPage() {
                         </button>
                       )}
 
-                      {hasInstallments && !exp.cardPaid && (
+                      {hasInstallments && (
                         <button
-                          onClick={() => handleRegisterInstallment(exp)}
-                          disabled={isToggling}
+                          onClick={() => setPayingMonthId(isPickerOpen ? null : exp.id)}
                           style={{
                             height: 30, padding: "0 12px", borderRadius: 7,
-                            border: `1px solid ${T.purpleBorder}`,
-                            background: T.purpleBg, color: T.purple,
+                            border: `1px solid ${isPickerOpen ? T.purple : T.purpleBorder}`,
+                            background: isPickerOpen ? T.purple : T.purpleBg,
+                            color: isPickerOpen ? T.white : T.purple,
                             fontSize: 11, fontWeight: 600,
                             cursor: "pointer", fontFamily: "var(--font-poppins)",
-                            opacity: isToggling ? 0.5 : 1,
-                            whiteSpace: "nowrap",
+                            whiteSpace: "nowrap", transition: "all 0.15s",
                           }}
                         >
-                          {isToggling ? "..." : `+1 mes (${installmentsLeft} rest.)`}
+                          {exp.cardPaid ? `${installmentsPaidCount}/${exp.installments} ✓` : `Registrar pago (${installmentsLeft} rest.)`}
                         </button>
                       )}
 
+                      <button
+                        onClick={() => { setEditingExpense(exp); setShowForm(true); }}
+                        title="Editar"
+                        style={{
+                          width: 30, height: 30, padding: 0,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          borderRadius: 7, border: `1px solid ${T.border}`,
+                          background: "transparent", color: T.mutedLight,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <Pencil size={13} />
+                      </button>
                       <button
                         onClick={() => handleDelete(exp.id)}
                         disabled={isDeleting}
