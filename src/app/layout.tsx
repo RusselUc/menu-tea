@@ -10,12 +10,23 @@ const poppins = Poppins({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#090909",
+  themeColor: "#CD576A",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export const metadata: Metadata = {
   title: "Té Sueño · Bobba Tea",
   description: "Menú digital de Té Sueño Bobba Tea",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Té Sueño",
+  },
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
