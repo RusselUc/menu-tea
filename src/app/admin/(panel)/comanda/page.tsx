@@ -177,6 +177,8 @@ function OrderCard({
                 {item.flavor}
               </p>
               <p style={{ margin: 0, fontSize: 11, color: T.muted }}>
+                {CAT_LABELS[item.category] ?? item.category}
+                {" · "}
                 {SIZE_LABELS[item.size] ?? item.size}
                 {item.toppings?.length > 0 && ` · ${item.toppings.join(", ")}`}
               </p>
