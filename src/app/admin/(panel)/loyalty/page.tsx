@@ -5,7 +5,9 @@ import {
   getCard,
   getRecentCards,
   getTotalCards,
+  getLoyaltyStats,
   LoyaltyCard,
+  LoyaltyStats,
   normalizePhone,
   redeemFreeDrink,
   STAMPS_FOR_FREE,
@@ -73,6 +75,7 @@ export default function LoyaltyPage() {
   const [recentCards, setRecentCards] = useState<LoyaltyCard[]>([]);
   const [recentLoading, setRecentLoading] = useState(true);
   const [totalCards, setTotalCards] = useState<number | null>(null);
+  const [loyaltyStats, setLoyaltyStats] = useState<LoyaltyStats | null>(null);
 
   useEffect(() => {
     getRecentCards(10)
@@ -80,6 +83,7 @@ export default function LoyaltyPage() {
       .catch(() => {})
       .finally(() => setRecentLoading(false));
     getTotalCards().then(setTotalCards).catch(() => {});
+    getLoyaltyStats().then(setLoyaltyStats).catch(() => {});
   }, []);
 
   function showToast(msg: string, type: "success" | "free") {
@@ -155,6 +159,23 @@ export default function LoyaltyPage() {
       margin: "0 auto",
       fontFamily: "var(--font-poppins)",
     }}>
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
+        {[
+          { label: "Tarjetas registradas",  value: loyaltyStats?.totalCards },
+          { label: "Con sellos activos",    value: loyaltyStats?.activeCards },
+          { label: "Bebidas gratis disp.",  value: loyaltyStats?.freeDrinksAvailable },
+          { label: "Sellos dados hoy",      value: loyaltyStats?.stampsTodayCount },
+        ].map(({ label, value }) => (
+          <div key={label} style={{ padding: "12px 14px", background: T.white, borderRadius: 10, border: `1px solid ${T.border}` }}>
+            <p style={{ margin: "0 0 4px", fontSize: 11, color: T.muted, fontWeight: 500 }}>{label}</p>
+            <p style={{ margin: 0, fontSize: 24, fontWeight: 700, color: value === undefined ? T.mutedLight : T.text, letterSpacing: "-0.02em", lineHeight: 1 }}>
+              {value === undefined ? "—" : value}
+            </p>
+          </div>
+        ))}
+      </div>
+
       {/* Toast */}
       {toast && (
         <div style={{

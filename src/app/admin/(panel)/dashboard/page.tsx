@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CalendarIcon, RefreshCw, Megaphone, Check } from "lucide-react";
+import { CalendarIcon, RefreshCw, Megaphone, Check, X, Copy, MessageCircle, Pencil } from "lucide-react";
 import { type DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -277,13 +277,25 @@ export default function DashboardPage() {
   const [bannerDraft, setBannerDraft] = useState<BannerSettings>({ enabled: false, message: "" });
   const [bannerSaving, setBannerSaving] = useState(false);
   const [bannerSaved, setBannerSaved] = useState(false);
+  const [editingBanner, setEditingBanner] = useState(false);
 
   useEffect(() => {
-    getBanner().then((b) => {
-      setBanner(b);
-      setBannerDraft(b);
-    });
+    getBanner().then((b) => { setBanner(b); setBannerDraft(b); });
   }, []);
+
+  async function handleToggleBanner() {
+    const newDraft = { ...bannerDraft, enabled: !bannerDraft.enabled };
+    setBannerDraft(newDraft);
+    if (newDraft.enabled) {
+      setEditingBanner(true);
+    } else {
+      setEditingBanner(false);
+      setBannerSaving(true);
+      await saveBanner(newDraft);
+      setBanner(newDraft);
+      setBannerSaving(false);
+    }
+  }
 
   async function handleSaveBanner() {
     setBannerSaving(true);
@@ -291,7 +303,65 @@ export default function DashboardPage() {
     setBanner(bannerDraft);
     setBannerSaving(false);
     setBannerSaved(true);
-    setTimeout(() => setBannerSaved(false), 2500);
+    setEditingBanner(false);
+    setTimeout(() => setBannerSaved(false), 2000);
+  }
+
+  // Cierre del día
+  const [showCierre, setShowCierre] = useState(false);
+  const [cierreOrders, setCierreOrders] = useState<Order[]>([]);
+  const [cierreExpenses, setCierreExpenses] = useState<Expense[]>([]);
+  const [cierreLoading, setCierreLoading] = useState(false);
+  const [cierre_copied, setCierre_copied] = useState(false);
+
+  async function handleOpenCierre() {
+    setShowCierre(true);
+    setCierreLoading(true);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const [o, e] = await Promise.all([getOrders(today, today), getExpenses(today, today)]);
+    setCierreOrders(o);
+    setCierreExpenses(e);
+    setCierreLoading(false);
+  }
+
+  function generarTextoCierre(
+    delivered: Order[], allCierre: Order[], gastos: Expense[], net: number,
+    top: [string, number][]
+  ) {
+    const fecha = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    const activos = allCierre.filter((o) => o.status !== "cancelled").length;
+    const pendientes = allCierre.filter((o) => o.status === "pending" || o.status === "success").length;
+    const cancelados = allCierre.filter((o) => o.status === "cancelled").length;
+    const ingresos = delivered.reduce((s, o) => s + getOrderTotal(o), 0);
+    const totalGastos = gastos.reduce((s, e) => s + e.amount, 0);
+    let txt = `CIERRE DEL DÍA — Té Sueño\n${fecha}\n\n`;
+    txt += `PEDIDOS\n• Activos: ${activos}\n• Entregados: ${delivered.length}\n`;
+    if (pendientes > 0) txt += `• Pendientes: ${pendientes}\n`;
+    if (cancelados > 0) txt += `• Cancelados: ${cancelados}\n`;
+    txt += `• Ingresos: $${ingresos}\n`;
+    if (totalGastos > 0) txt += `\nGASTOS: $${totalGastos}\n`;
+    txt += `\nGANANCIA NETA: $${net}\n`;
+    if (top.length > 0) {
+      txt += `\nTOP BEBIDAS\n`;
+      top.forEach(([name, cnt], i) => { txt += `${i + 1}. ${name} — ${cnt}\n`; });
+    }
+    return txt;
+  }
+
+  async function handleCopiarCierre(
+    delivered: Order[], allCierre: Order[], gastos: Expense[], net: number,
+    top: [string, number][]
+  ) {
+    await navigator.clipboard.writeText(generarTextoCierre(delivered, allCierre, gastos, net, top));
+    setCierre_copied(true);
+    setTimeout(() => setCierre_copied(false), 2500);
+  }
+
+  function handleWhatsAppCierre(
+    delivered: Order[], allCierre: Order[], gastos: Expense[], net: number,
+    top: [string, number][]
+  ) {
+    window.open(`https://wa.me/?text=${encodeURIComponent(generarTextoCierre(delivered, allCierre, gastos, net, top))}`, "_blank");
   }
 
   async function fetchAll(bounds: { from?: Date; to?: Date; limitCount?: number }) {
@@ -374,6 +444,21 @@ export default function DashboardPage() {
   const pendingCardTotal = cardExpenses.filter((e) => !e.cardPaid).reduce((s, e) => s + e.amount, 0);
   const pendingCardCount = cardExpenses.filter((e) => !e.cardPaid).length;
 
+  // Cierre computed
+  const cierreDelivered = cierreOrders.filter((o) => o.status === "delivered");
+  const cierreRevenue   = cierreDelivered.reduce((s, o) => s + getOrderTotal(o), 0);
+  const cierreGastos    = cierreExpenses.reduce((s, e) => s + e.amount, 0);
+  const cierreNet       = cierreRevenue - cierreGastos;
+  const cierre_pending  = cierreOrders.filter((o) => o.status === "pending" || o.status === "success").length;
+  const topCierre: [string, number][] = (() => {
+    const counts: Record<string, number> = {};
+    cierreOrders.filter((o) => o.status !== "cancelled").forEach((o) => {
+      if (o.items) o.items.forEach((i) => { counts[i.flavor] = (counts[i.flavor] || 0) + i.quantity; });
+      else if (o.flavor) counts[o.flavor] = (counts[o.flavor] || 0) + (o.quantity || 1);
+    });
+    return Object.entries(counts).sort(([, a], [, b]) => b - a).slice(0, 3);
+  })();
+
   return (
     <>
       <style>{`
@@ -382,18 +467,21 @@ export default function DashboardPage() {
         .dash-mid    { display: grid; grid-template-columns: 1fr; gap: 12px; }
         .period-tabs { display: flex; gap: 4; background: #F1F5F9; border-radius: 10px; padding: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; width: 100%; }
         .period-tabs::-webkit-scrollbar { display: none; }
+        .dash-header { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+        .dash-header-actions { display: flex; gap: 8px; }
         @media (min-width: 768px) {
           .dash-stats  { grid-template-columns: repeat(4, 1fr); }
           .dash-fin    { grid-template-columns: repeat(3, 1fr); }
           .dash-mid    { grid-template-columns: 3fr 2fr; }
           .period-tabs { width: fit-content; }
+          .dash-header { flex-direction: row; justify-content: space-between; align-items: flex-end; }
         }
       `}</style>
 
       <div style={{ padding: "28px 24px 32px", maxWidth: 1100, margin: "0 auto", fontFamily: "var(--font-poppins)" }}>
 
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 20 }}>
+        <div className="dash-header">
           <div>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: T.text, letterSpacing: "-0.02em" }}>
               Dashboard
@@ -402,110 +490,83 @@ export default function DashboardPage() {
               {todayStr}
             </p>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              height: 36, padding: "0 14px", borderRadius: 8,
-              border: `1px solid ${T.border}`, background: T.white,
-              color: T.muted, fontSize: 13, fontWeight: 500,
-              cursor: "pointer", fontFamily: "var(--font-poppins)",
-            }}
-          >
-            <RefreshCw size={13} style={{ transition: "transform 0.5s", transform: refreshing ? "rotate(360deg)" : "none" }} />
-            Actualizar
-          </button>
-        </div>
-
-        {/* Banner editor */}
-        <div style={{
-          background: T.white,
-          border: `1px solid ${T.border}`,
-          borderRadius: 12,
-          padding: "14px 16px",
-          marginBottom: 20,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: bannerDraft.enabled ? 12 : 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Megaphone size={15} style={{ color: T.muted }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Banner del menú</span>
-              {banner.enabled && (
-                <span style={{
-                  fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 100,
-                  background: "#ECFDF5", color: "#059669", border: "1px solid #A7F3D0",
-                }}>
-                  Activo
-                </span>
-              )}
-            </div>
-            {/* Toggle */}
+          <div className="dash-header-actions">
             <button
-              onClick={() => setBannerDraft((d) => ({ ...d, enabled: !d.enabled }))}
+              onClick={handleOpenCierre}
               style={{
-                width: 40, height: 22, borderRadius: 11, border: "none",
-                background: bannerDraft.enabled ? "#2563EB" : "#CBD5E1",
-                cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0,
+                display: "flex", alignItems: "center", gap: 6,
+                height: 36, padding: "0 14px", borderRadius: 8,
+                border: "none", background: T.text,
+                color: T.white, fontSize: 13, fontWeight: 600,
+                cursor: "pointer", fontFamily: "var(--font-poppins)",
               }}
             >
-              <span style={{
-                position: "absolute", top: 3,
-                left: bannerDraft.enabled ? 21 : 3,
-                width: 16, height: 16, borderRadius: "50%",
-                background: "#fff", transition: "left 0.2s",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-              }} />
+              Cierre del día
+            </button>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                height: 36, padding: "0 14px", borderRadius: 8,
+                border: `1px solid ${T.border}`, background: T.white,
+                color: T.muted, fontSize: 13, fontWeight: 500,
+                cursor: "pointer", fontFamily: "var(--font-poppins)",
+              }}
+            >
+              <RefreshCw size={13} style={{ transition: "transform 0.5s", transform: refreshing ? "rotate(360deg)" : "none" }} />
+              Actualizar
             </button>
           </div>
+        </div>
 
-          {bannerDraft.enabled && (
-            <div style={{ display: "flex", gap: 8 }}>
+        {/* Banner editor — compacto */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "10px 14px", background: T.white,
+            border: `1px solid ${T.border}`,
+            borderRadius: editingBanner ? "10px 10px 0 0" : 10,
+          }}>
+            <Megaphone size={14} style={{ color: bannerDraft.enabled ? T.blue : T.muted, flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: 13, color: bannerDraft.enabled && bannerDraft.message ? T.text : T.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {bannerDraft.enabled && bannerDraft.message ? bannerDraft.message : "Banner del menú"}
+            </span>
+            {bannerDraft.enabled && !editingBanner && (
+              <button onClick={() => setEditingBanner(true)} style={{ background: "none", border: "none", cursor: "pointer", color: T.mutedLight, padding: 4, display: "flex" }}>
+                <Pencil size={13} />
+              </button>
+            )}
+            {banner.enabled && (
+              <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 100, background: T.blueBg, color: T.blue, border: `1px solid ${T.blueBorder}`, flexShrink: 0 }}>
+                Activo
+              </span>
+            )}
+            <button
+              onClick={handleToggleBanner}
+              disabled={bannerSaving}
+              style={{ width: 36, height: 20, borderRadius: 10, border: "none", background: bannerDraft.enabled ? T.blue : "#CBD5E1", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0, opacity: bannerSaving ? 0.6 : 1 }}
+            >
+              <span style={{ position: "absolute", top: 2, left: bannerDraft.enabled ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+            </button>
+          </div>
+          {editingBanner && (
+            <div style={{ display: "flex", gap: 8, padding: "10px 14px", background: T.bg, border: `1px solid ${T.border}`, borderTop: "none", borderRadius: "0 0 10px 10px" }}>
               <textarea
                 value={bannerDraft.message}
                 onChange={(e) => setBannerDraft((d) => ({ ...d, message: e.target.value }))}
                 placeholder="Ej: Esta semana estamos en la Feria — no hay servicio a domicilio"
                 rows={2}
-                style={{
-                  flex: 1, padding: "8px 12px", borderRadius: 8,
-                  border: `1px solid ${T.border}`, background: T.bg,
-                  fontSize: 13, color: T.text, fontFamily: "var(--font-poppins)",
-                  resize: "none", outline: "none", lineHeight: 1.5,
-                }}
+                style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, background: T.white, fontSize: 13, color: T.text, fontFamily: "var(--font-poppins)", resize: "none", outline: "none", lineHeight: 1.5 }}
               />
-              <button
-                onClick={handleSaveBanner}
-                disabled={bannerSaving}
-                style={{
-                  height: 64, padding: "0 16px", borderRadius: 8, border: "none",
-                  background: bannerSaved ? "#059669" : T.text,
-                  color: "#fff", fontSize: 13, fontWeight: 600,
-                  cursor: "pointer", fontFamily: "var(--font-poppins)",
-                  display: "flex", alignItems: "center", gap: 6,
-                  transition: "background 0.2s", flexShrink: 0,
-                  opacity: bannerSaving ? 0.7 : 1,
-                }}
-              >
-                {bannerSaved ? <><Check size={14} /> Guardado</> : bannerSaving ? "..." : "Guardar"}
-              </button>
-            </div>
-          )}
-
-          {!bannerDraft.enabled && banner.enabled !== bannerDraft.enabled && (
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
-              <button
-                onClick={handleSaveBanner}
-                disabled={bannerSaving}
-                style={{
-                  height: 32, padding: "0 14px", borderRadius: 8, border: "none",
-                  background: bannerSaved ? "#059669" : T.text,
-                  color: "#fff", fontSize: 12, fontWeight: 600,
-                  cursor: "pointer", fontFamily: "var(--font-poppins)",
-                  display: "flex", alignItems: "center", gap: 5,
-                  transition: "background 0.2s",
-                }}
-              >
-                {bannerSaved ? <><Check size={12} /> Guardado</> : "Desactivar banner"}
-              </button>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <button onClick={handleSaveBanner} disabled={bannerSaving} style={{ height: 38, padding: "0 14px", borderRadius: 8, border: "none", background: bannerSaved ? T.green : T.text, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-poppins)", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}>
+                  {bannerSaved ? <><Check size={13} /> Guardado</> : "Guardar"}
+                </button>
+                <button onClick={() => { setEditingBanner(false); setBannerDraft(banner); }} style={{ height: 28, padding: "0 14px", borderRadius: 8, border: `1px solid ${T.border}`, background: "transparent", color: T.muted, fontSize: 12, cursor: "pointer", fontFamily: "var(--font-poppins)" }}>
+                  Cancelar
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -755,6 +816,124 @@ export default function DashboardPage() {
         </div>
 
       </div>
+
+      {/* ── Modal cierre del día ──────────────────── */}
+      {showCierre && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCierre(false); }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 100,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16, fontFamily: "var(--font-poppins)",
+          }}
+        >
+          <div style={{ background: T.white, borderRadius: 16, width: "100%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto" }}>
+
+            {/* Header */}
+            <div style={{ padding: "18px 20px 14px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: T.text }}>Cierre del día</h2>
+                <p style={{ margin: "3px 0 0", fontSize: 12, color: T.muted, textTransform: "capitalize" }}>
+                  {new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                </p>
+              </div>
+              <button onClick={() => setShowCierre(false)} style={{ background: "none", border: "none", cursor: "pointer", color: T.muted, padding: 4 }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: 20 }}>
+              {cierreLoading ? (
+                <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
+                  <p style={{ color: T.mutedLight, fontSize: 13, margin: 0 }}>Cargando...</p>
+                </div>
+              ) : (
+                <>
+                  {/* Stats 2x2 */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+                    <div style={{ padding: "14px 16px", background: T.bg, borderRadius: 10, border: `1px solid ${T.border}` }}>
+                      <p style={{ margin: "0 0 4px", fontSize: 11, color: T.muted, fontWeight: 500 }}>Órdenes activas</p>
+                      <p style={{ margin: 0, fontSize: 28, fontWeight: 700, color: T.text, letterSpacing: "-0.02em" }}>
+                        {cierreOrders.filter((o) => o.status !== "cancelled").length}
+                      </p>
+                      <p style={{ margin: "4px 0 0", fontSize: 11, color: T.mutedLight }}>
+                        {cierreDelivered.length} entregadas · {cierre_pending} pendientes
+                      </p>
+                    </div>
+                    <div style={{ padding: "14px 16px", background: T.bg, borderRadius: 10, border: `1px solid ${T.border}` }}>
+                      <p style={{ margin: "0 0 4px", fontSize: 11, color: T.muted, fontWeight: 500 }}>Ingresos</p>
+                      <p style={{ margin: 0, fontSize: 28, fontWeight: 700, color: T.green, letterSpacing: "-0.02em" }}>${cierreRevenue}</p>
+                      <p style={{ margin: "4px 0 0", fontSize: 11, color: T.mutedLight }}>órdenes entregadas</p>
+                    </div>
+                    <div style={{ padding: "14px 16px", background: T.bg, borderRadius: 10, border: `1px solid ${T.border}` }}>
+                      <p style={{ margin: "0 0 4px", fontSize: 11, color: T.muted, fontWeight: 500 }}>Gastos del día</p>
+                      <p style={{ margin: 0, fontSize: 28, fontWeight: 700, color: cierreGastos > 0 ? T.red : T.mutedLight, letterSpacing: "-0.02em" }}>${cierreGastos}</p>
+                      <p style={{ margin: "4px 0 0", fontSize: 11, color: T.mutedLight }}>{cierreExpenses.length} registro{cierreExpenses.length !== 1 ? "s" : ""}</p>
+                    </div>
+                    <div style={{ padding: "14px 16px", background: cierreNet >= 0 ? T.greenBg : T.redBg, borderRadius: 10, border: `1px solid ${cierreNet >= 0 ? T.greenBorder : T.redBorder}` }}>
+                      <p style={{ margin: "0 0 4px", fontSize: 11, color: T.muted, fontWeight: 500 }}>Ganancia neta</p>
+                      <p style={{ margin: 0, fontSize: 28, fontWeight: 700, color: cierreNet >= 0 ? T.green : T.red, letterSpacing: "-0.02em" }}>${cierreNet}</p>
+                      <p style={{ margin: "4px 0 0", fontSize: 11, color: T.mutedLight }}>ingresos − gastos</p>
+                    </div>
+                  </div>
+
+                  {/* Top bebidas */}
+                  {topCierre.length > 0 && (
+                    <div style={{ marginBottom: 20 }}>
+                      <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 600, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                        Top bebidas hoy
+                      </p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {topCierre.map(([name, cnt], i) => (
+                          <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: T.bg, borderRadius: 8 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: i === 0 ? T.blue : T.mutedLight, width: 14, textAlign: "center" }}>{i + 1}</span>
+                              <span style={{ fontSize: 13, color: T.secondary }}>{name}</span>
+                            </div>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: T.muted }}>{cnt}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Acciones */}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={() => handleCopiarCierre(cierreDelivered, cierreOrders, cierreExpenses, cierreNet, topCierre)}
+                      style={{
+                        flex: 1, height: 42, borderRadius: 10,
+                        border: `1px solid ${T.border}`,
+                        background: cierre_copied ? T.greenBg : T.white,
+                        color: cierre_copied ? T.green : T.secondary,
+                        fontSize: 13, fontWeight: 600, cursor: "pointer",
+                        fontFamily: "var(--font-poppins)",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      {cierre_copied ? <><Check size={14} /> Copiado</> : <><Copy size={14} /> Copiar</>}
+                    </button>
+                    <button
+                      onClick={() => handleWhatsAppCierre(cierreDelivered, cierreOrders, cierreExpenses, cierreNet, topCierre)}
+                      style={{
+                        flex: 1, height: 42, borderRadius: 10,
+                        border: "none", background: "#25D366", color: "#fff",
+                        fontSize: 13, fontWeight: 600, cursor: "pointer",
+                        fontFamily: "var(--font-poppins)",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                      }}
+                    >
+                      <MessageCircle size={14} /> WhatsApp
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

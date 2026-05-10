@@ -104,3 +104,25 @@ export async function redeemFreeDrink(phone: string): Promise<void> {
   if (card.freedrinks <= 0) throw new Error("Sin bebidas gratis disponibles");
   await updateDoc(ref, { freedrinks: card.freedrinks - 1 });
 }
+
+export interface LoyaltyStats {
+  totalCards: number;
+  activeCards: number;
+  freeDrinksAvailable: number;
+  stampsTodayCount: number;
+}
+
+export async function getLoyaltyStats(): Promise<LoyaltyStats> {
+  const snap = await getDocs(collection(db, "loyalty_cards"));
+  const cards = snap.docs.map((d) => d.data() as LoyaltyCard);
+  const todayTs = new Date().setHours(0, 0, 0, 0);
+  return {
+    totalCards: cards.length,
+    activeCards: cards.filter((c) => c.stamps > 0).length,
+    freeDrinksAvailable: cards.reduce((s, c) => s + (c.freedrinks || 0), 0),
+    stampsTodayCount: cards.reduce(
+      (s, c) => s + (c.history || []).filter((ts) => ts >= todayTs).length,
+      0
+    ),
+  };
+}
