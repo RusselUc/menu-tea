@@ -12,7 +12,7 @@ Menu interactivo para **Té Sueño**, una tienda de bubble tea. Los clientes pue
 
 - **Next.js 15** + **React 19** + **TypeScript 5**
 - **Tailwind CSS 4** (con PostCSS)
-- **Firebase 12** (Firestore) — menu, precios, toppings, sesiones, ordenes, fidelidad
+- **Firebase 12** (Firestore) — menu, precios, toppings, sesiones, ordenes, fidelidad, gastos
 - **Supabase Storage** — imagenes de productos (bucket `menu`, ruta `{itemId}/{category}.{ext}`)
 - **Leaflet / react-leaflet** — mapa en la pantalla de entrega
 - **Radix UI** (checkbox, dialog, label, slot) + **Vaul** (drawer/modal con animaciones)
@@ -40,8 +40,10 @@ src/
 │   │   ├── page.tsx                      # Login admin (PIN)
 │   │   ├── actions.ts                    # Server action: validateAdminPin()
 │   │   └── (panel)/
-│   │       ├── layout.tsx                # Layout del panel (requiere sesion) — sidebar con logo
+│   │       ├── layout.tsx                # Layout del panel (requiere sesion) — sidebar + bottom nav
+│   │       ├── comanda/page.tsx          # Comandas en tiempo real
 │   │       ├── dashboard/page.tsx        # Metricas y pedidos con filtro por periodo/rango
+│   │       ├── gastos/page.tsx           # Gestion de gastos del negocio
 │   │       ├── menu/page.tsx             # Gestion de productos, precios y toppings
 │   │       └── loyalty/page.tsx          # Gestion de tarjetas de fidelidad
 │   ├── api/
@@ -63,7 +65,8 @@ src/
     ├── supabase.ts                       # Cliente Supabase + uploadMenuImageSupabase()
     ├── menu-items.ts                     # CRUD Firestore: menu_items, price_rules, toppings
     ├── loyalty.ts                        # Operaciones Firestore para tarjetas de fidelidad
-    ├── orders.ts                         # CRUD Firestore: orders — getOrders(from?, to?), saveFullOrder, updateOrderStatus
+    ├── expenses.ts                       # CRUD Firestore: expenses — gastos del negocio
+    ├── orders.ts                         # CRUD Firestore: orders — getOrders, saveFullOrder, subscribeToCommandaOrders
     └── utils.ts                          # Utilidades (cn, etc.)
 ```
 
@@ -155,6 +158,8 @@ const C = {
 };
 ```
 
+El panel admin usa un sistema de tokens distinto (objeto `T`) con colores neutros slate/blue.
+
 ## Logica de precios (`getPrice` en `src/components/menu/index.tsx`)
 
 ```
@@ -192,8 +197,10 @@ Colecciones en Firestore:
 | `menu_items`    | Productos del menu (nombre, categorias, tier, precios, imagenes)   |
 | `settings`      | Config global: `price_rules` y `toppings`                          |
 | `sessions`      | Sesiones de delivery en vivo (lat/long/timestamp)                  |
-| `orders`        | Ordenes guardadas al hacer pedido por WhatsApp                     |
+| `orders`        | Ordenes guardadas (WhatsApp y comanda interna)                     |
 | `loyalty_cards` | Tarjetas de fidelidad indexadas por telefono                       |
+| `expenses`      | Gastos del negocio (efectivo y tarjeta, con MSI)                   |
+| `settings/banner` | Banner informativo del menú público (`enabled`, `message`)       |
 
 La config se lee desde variables de entorno `NEXT_PUBLIC_FIREBASE_*`. Ver `src/lib/firebase.ts`.
 
@@ -245,10 +252,68 @@ interface ToppingGroup {
 // guardado como: { groups: ToppingGroup[] }
 ```
 
+### Schema `orders/{id}`
+
+```ts
+type OrderStatus = "pending" | "success" | "ready" | "delivered" | "cancelled";
+
+interface OrderItem {
+  flavor: string;
+  size: string;
+  category: string;
+  toppings: string[];
+  price: number;
+  quantity: number;
+}
+
+interface Order {
+  id: string;
+  items?: OrderItem[];       // formato nuevo (multi-item)
+  total?: number;
+  phone?: string;
+  // formato legacy (single-item, compatibilidad hacia atras)
+  flavor?: string;
+  size?: string;
+  category?: string;
+  toppings?: string[];
+  price?: number;
+  quantity?: number;
+  // comanda
+  orderNumber?: number;      // consecutivo diario (1, 2, 3…)
+  source?: "whatsapp" | "comanda";
+  // comun
+  timestamp: Timestamp;
+  status: OrderStatus;
+}
+```
+
+Flujo de estados: `pending`/`success` → `ready` → `delivered` | `cancelled`
+
+### Schema `expenses/{id}`
+
+```ts
+type PaymentMethod = "cash" | "card";
+
+interface Expense {
+  id: string;
+  description: string;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  cardName?: string;          // ej. "BBVA", "Banamex"
+  cardDueDay?: number;        // dia del mes en que se paga
+  cardPaid?: boolean;
+  installments?: number;      // total de meses sin intereses
+  firstPaymentMonth?: string; // "YYYY-MM" (ej. "2026-06")
+  paidMonths?: string[];      // meses pagados ["YYYY-MM", ...]
+  installmentsPaid?: number;  // legacy: contador simple
+  timestamp: Timestamp;
+}
+```
+
 ## Flujo de pedido (WhatsApp)
 
 Al confirmar en `BottomCart.tsx`:
-1. Guarda la orden en Firestore coleccion `orders` (con timestamp y `status: "success"`)
+1. Guarda la orden en Firestore coleccion `orders` con `source: "whatsapp"`, `status: "pending"`
 2. Abre WhatsApp al numero `529969634631` con el pedido formateado en texto
 3. Incluye telefono de fidelidad en el mensaje si el cliente lo ingreso
 
@@ -278,6 +343,64 @@ interface LoyaltyCard {
 
 Protegido por PIN via server action (`actions.ts` → `validateAdminPin()`). El `ADMIN_PIN` vive en el servidor y nunca se expone al cliente.
 
+El layout (`src/app/admin/(panel)/layout.tsx`) incluye:
+- **Sidebar** en desktop (220px, fijo a la izquierda)
+- **Bottom nav** en mobile (fijo en el footer)
+
+Navegacion: **Comanda → Metricas → Gastos → Fidelidad → Menu**
+
+### `/admin/(panel)/comanda` — Comandas en tiempo real
+
+Vista de cocina/caja para gestionar ordenes del dia en tiempo real.
+
+- Suscripcion en tiempo real via `subscribeToCommandaOrders` (Firestore `onSnapshot`, solo ordenes de hoy)
+- Toast de notificacion al llegar una orden nueva
+- Tabs en mobile: **Nuevos / Listos / Historial**
+- Desktop: grid 2 columnas (Nuevos + Listos) + seccion de historial abajo
+- Acciones por estado:
+  - `pending`/`success` → boton "Listo" (→ `ready`) + "Cancelar"
+  - `ready` → boton "Entregar" (→ `delivered`) + revertir a `pending`
+- Crear orden interna desde el panel: drawer lateral con buscador de productos, selector de categoria, tamano, toppings y resumen. Se guarda con `source: "comanda"` y `orderNumber` consecutivo diario.
+- Badge de fuente en cada tarjeta: "WhatsApp" (verde) o "Comanda" (morado)
+
+**Funciones clave en `src/lib/orders.ts`:**
+- `subscribeToCommandaOrders(callback)` — suscripcion realtime de ordenes de hoy
+- `getNextOrderNumber()` — calcula el siguiente numero de orden del dia
+- `getOrderTotal(order)` — calcula total soportando formato nuevo y legacy
+- `getOrderLabel(order)` — etiqueta resumida de la orden
+- `saveFullOrder({ items, total, phone?, orderNumber?, source? })` — guarda con `status: "pending"`
+
+### `/admin/(panel)/dashboard` — Metricas
+
+- Filtros de periodo: Hoy, Semana, Mes, Todo, Rango
+- Cards: pedidos, ingresos, pendientes, cancelados — todos filtrados por el periodo activo
+- Grafico de barras por dia/semana/mes segun el periodo
+- Top 5 bebidas mas pedidas en el periodo
+- Lista de pedidos con acciones (Entregado / Cancelar / Revertir)
+
+#### Logica de fetch
+
+- Periodos fijos (Hoy/Semana/Mes/Todo) → fetch automatico al cambiar de tab
+- **Rango** → fetch manual: el usuario elige fechas con el date range picker (shadcn Calendar) y presiona "Consultar". No se lanza ninguna query hasta entonces
+- "Todo" usa `limit(500)` en Firestore para evitar traer toda la coleccion
+- `getOrders(from?, to?, limitCount?)` en `src/lib/orders.ts` — filtra por `timestamp` con `where` en Firestore
+
+### `/admin/(panel)/gastos` — Gestion de gastos
+
+- Registrar gastos del negocio con metodo de pago: **Efectivo** o **Tarjeta**
+- Para pagos con tarjeta: nombre de tarjeta, dia de corte, opcion de meses sin intereses (MSI)
+- MSI: se define el numero de meses y el mes de primer pago (`YYYY-MM`). El sistema muestra un chip por mes y permite marcar cuales se han pagado
+- Filtros de periodo identicos al dashboard (Hoy/Semana/Mes/Todo/Rango)
+- Cards de resumen: total de gastos, gastos en efectivo, gastos en tarjeta, MSI pendientes
+- CRUD completo: agregar, editar (lapiz), eliminar
+- **Funciones en `src/lib/expenses.ts`:**
+  - `getExpenses(from?, to?, limitCount?)` — lista con filtro de fecha
+  - `addExpense(expense)` — crear nuevo gasto
+  - `updateExpense(id, data)` — actualizar cualquier campo
+  - `updateExpenseCardPaid(id, cardPaid)` — marcar tarjeta pagada/pendiente
+  - `updateExpensePaidMonths(id, paidMonths, cardPaid)` — actualizar meses MSI pagados
+  - `deleteExpense(id)` — eliminar
+
 ### `/admin/(panel)/menu` — Gestion de menu
 
 - Listar, buscar y filtrar productos por categoria
@@ -288,28 +411,24 @@ Protegido por PIN via server action (`actions.ts` → `validateAdminPin()`). El 
 - **Toppings**: editar grupos y items, activar/desactivar por topping (`settings/toppings`)
 - Boton "Importar del codigo" para hacer seed inicial desde `menu.ts` (solo si la coleccion esta vacia)
 
-### `/admin/(panel)/dashboard` — Metricas
-
-- Filtros de periodo: Hoy, Semana, Mes, Todo, Rango
-- Cards: pedidos, ingresos, pendientes, cancelados — todos filtrados por el periodo activo
-- Grafico de barras por dia/semana/mes segun el periodo
-- Top 5 bebidas mas pedidas en el periodo
-- Lista de pedidos con acciones (Entregado / Cancelar / Revertir)
-- El sidebar usa `logo-pink.png` en lugar de texto
-
-#### Logica de fetch
-
-- Periodos fijos (Hoy/Semana/Mes/Todo) → fetch automatico al cambiar de tab
-- **Rango** → fetch manual: el usuario elige fechas con el date range picker (shadcn Calendar) y presiona "Consultar". No se lanza ninguna query hasta entonces
-- "Todo" usa `limit(500)` en Firestore para evitar traer toda la coleccion
-- `getOrders(from?, to?, limitCount?)` en `src/lib/orders.ts` — filtra por `timestamp` con `where` en Firestore
-
 ### `/admin/(panel)/loyalty` — Tarjetas de fidelidad
 
 - Buscar tarjeta por telefono
 - Agregar sello
 - Canjear bebida gratis
 - Generar link de WhatsApp para enviarle la tarjeta al cliente
+
+## Feature: Banner informativo
+
+Tira delgada que aparece entre el header y las tabs de categorias en el menu publico. Editable desde el dashboard admin.
+
+**Firestore**: `settings/banner` — `{ enabled: boolean, message: string }`
+
+**`src/lib/menu-items.ts`**: `getBanner()` / `saveBanner(banner)`
+
+**Menú publico** (`src/components/menu/index.tsx`): se fetcha junto con el resto del menu en el `Promise.all` inicial. Se renderiza solo si `enabled === true` y `message` no esta vacio.
+
+**Admin** (`/admin/dashboard`): card con toggle on/off + textarea + boton "Guardar". Al desactivar aparece un boton para confirmar la desactivacion. El estado `bannerDraft` maneja cambios locales; se persiste en Firestore al guardar.
 
 ## Feature: Sorpréndeme
 
@@ -333,3 +452,4 @@ Boton en el menu publico que abre un bottom sheet con una bebida aleatoria pre-a
 - El carrito muestra una barra fija en el footer solo cuando `cartItemCount > 0`.
 - Las imagenes de productos se sirven desde Supabase Storage. Las imagenes estaticas en `src/assets/images/` solo se usan como fallback cuando un item de Firestore no tiene `imageUrls`.
 - `next.config.ts` incluye `*.supabase.co` en `images.remotePatterns` para permitir `next/image` con URLs de Supabase.
+- El schema de `Order` mantiene compatibilidad con el formato legacy (single-item) via campos opcionales `flavor`, `size`, `price`, `quantity`. Usar siempre `getOrderTotal()` y `getOrderLabel()` para leer ordenes.

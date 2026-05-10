@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CalendarIcon, RefreshCw } from "lucide-react";
+import { CalendarIcon, RefreshCw, Megaphone, Check } from "lucide-react";
 import { type DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -15,6 +15,7 @@ import {
   OrderStatus,
 } from "@/lib/orders";
 import { getExpenses, Expense } from "@/lib/expenses";
+import { getBanner, saveBanner, BannerSettings } from "@/lib/menu-items";
 
 // ── Tokens ─────────────────────────────────────────────
 const T = {
@@ -271,6 +272,28 @@ export default function DashboardPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loadingExp, setLoadingExp] = useState(true);
 
+  // Banner state
+  const [banner, setBanner] = useState<BannerSettings>({ enabled: false, message: "" });
+  const [bannerDraft, setBannerDraft] = useState<BannerSettings>({ enabled: false, message: "" });
+  const [bannerSaving, setBannerSaving] = useState(false);
+  const [bannerSaved, setBannerSaved] = useState(false);
+
+  useEffect(() => {
+    getBanner().then((b) => {
+      setBanner(b);
+      setBannerDraft(b);
+    });
+  }, []);
+
+  async function handleSaveBanner() {
+    setBannerSaving(true);
+    await saveBanner(bannerDraft);
+    setBanner(bannerDraft);
+    setBannerSaving(false);
+    setBannerSaved(true);
+    setTimeout(() => setBannerSaved(false), 2500);
+  }
+
   async function fetchAll(bounds: { from?: Date; to?: Date; limitCount?: number }) {
     const [o, e] = await Promise.all([
       getOrders(bounds.from, bounds.to, bounds.limitCount),
@@ -393,6 +416,98 @@ export default function DashboardPage() {
             <RefreshCw size={13} style={{ transition: "transform 0.5s", transform: refreshing ? "rotate(360deg)" : "none" }} />
             Actualizar
           </button>
+        </div>
+
+        {/* Banner editor */}
+        <div style={{
+          background: T.white,
+          border: `1px solid ${T.border}`,
+          borderRadius: 12,
+          padding: "14px 16px",
+          marginBottom: 20,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: bannerDraft.enabled ? 12 : 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Megaphone size={15} style={{ color: T.muted }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Banner del menú</span>
+              {banner.enabled && (
+                <span style={{
+                  fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 100,
+                  background: "#ECFDF5", color: "#059669", border: "1px solid #A7F3D0",
+                }}>
+                  Activo
+                </span>
+              )}
+            </div>
+            {/* Toggle */}
+            <button
+              onClick={() => setBannerDraft((d) => ({ ...d, enabled: !d.enabled }))}
+              style={{
+                width: 40, height: 22, borderRadius: 11, border: "none",
+                background: bannerDraft.enabled ? "#2563EB" : "#CBD5E1",
+                cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0,
+              }}
+            >
+              <span style={{
+                position: "absolute", top: 3,
+                left: bannerDraft.enabled ? 21 : 3,
+                width: 16, height: 16, borderRadius: "50%",
+                background: "#fff", transition: "left 0.2s",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+              }} />
+            </button>
+          </div>
+
+          {bannerDraft.enabled && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <textarea
+                value={bannerDraft.message}
+                onChange={(e) => setBannerDraft((d) => ({ ...d, message: e.target.value }))}
+                placeholder="Ej: Esta semana estamos en la Feria — no hay servicio a domicilio"
+                rows={2}
+                style={{
+                  flex: 1, padding: "8px 12px", borderRadius: 8,
+                  border: `1px solid ${T.border}`, background: T.bg,
+                  fontSize: 13, color: T.text, fontFamily: "var(--font-poppins)",
+                  resize: "none", outline: "none", lineHeight: 1.5,
+                }}
+              />
+              <button
+                onClick={handleSaveBanner}
+                disabled={bannerSaving}
+                style={{
+                  height: 64, padding: "0 16px", borderRadius: 8, border: "none",
+                  background: bannerSaved ? "#059669" : T.text,
+                  color: "#fff", fontSize: 13, fontWeight: 600,
+                  cursor: "pointer", fontFamily: "var(--font-poppins)",
+                  display: "flex", alignItems: "center", gap: 6,
+                  transition: "background 0.2s", flexShrink: 0,
+                  opacity: bannerSaving ? 0.7 : 1,
+                }}
+              >
+                {bannerSaved ? <><Check size={14} /> Guardado</> : bannerSaving ? "..." : "Guardar"}
+              </button>
+            </div>
+          )}
+
+          {!bannerDraft.enabled && banner.enabled !== bannerDraft.enabled && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+              <button
+                onClick={handleSaveBanner}
+                disabled={bannerSaving}
+                style={{
+                  height: 32, padding: "0 14px", borderRadius: 8, border: "none",
+                  background: bannerSaved ? "#059669" : T.text,
+                  color: "#fff", fontSize: 12, fontWeight: 600,
+                  cursor: "pointer", fontFamily: "var(--font-poppins)",
+                  display: "flex", alignItems: "center", gap: 5,
+                  transition: "background 0.2s",
+                }}
+              >
+                {bannerSaved ? <><Check size={12} /> Guardado</> : "Desactivar banner"}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Period filter tabs */}

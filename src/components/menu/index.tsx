@@ -3,7 +3,7 @@ import Image from "next/image";
 
 import { categories, Flavor, flavors, priceRules, SizeId, sizes } from "@/data/menu";
 import { useState, useEffect } from "react";
-import { getMenuItems, getPriceRules, getToppings, PriceRules, DEFAULT_PRICE_RULES, ToppingGroup, DEFAULT_TOPPINGS, MenuItem } from "@/lib/menu-items";
+import { getMenuItems, getPriceRules, getToppings, getBanner, PriceRules, DEFAULT_PRICE_RULES, ToppingGroup, DEFAULT_TOPPINGS, MenuItem, BannerSettings } from "@/lib/menu-items";
 
 import BottomProduct from "./BottomProduct";
 import BottomCart from "./BottomCart";
@@ -184,15 +184,17 @@ const Menu = () => {
   const [firestoreToppings, setFirestoreToppings] = useState<ToppingGroup[]>(DEFAULT_TOPPINGS);
   const [randomDraw, setRandomDraw] = useState<RandomDraw | null>(null);
   const [menuLoading, setMenuLoading] = useState(true);
+  const [banner, setBanner] = useState<BannerSettings | null>(null);
 
   useEffect(() => {
-    Promise.all([getMenuItems(), getPriceRules(), getToppings()])
-      .then(([items, prices, toppings]) => {
+    Promise.all([getMenuItems(), getPriceRules(), getToppings(), getBanner()])
+      .then(([items, prices, toppings, bannerData]) => {
         if (items.length > 0) {
           setFirestoreFlavors(items.filter((i) => i.active).map(menuItemToFlavor));
         }
         setFirestorePrices(prices);
         setFirestoreToppings(toppings);
+        setBanner(bannerData);
       })
       .catch(() => { /* silently fall back to static */ })
       .finally(() => setMenuLoading(false));
@@ -386,6 +388,44 @@ const Menu = () => {
           })}
         </div>
       </div>
+
+      {/* ── Banner informativo ──────────────────────── */}
+      {banner?.enabled && banner.message && (
+        <div
+          style={{
+            margin: "16px 16px 0",
+            padding: "12px 14px",
+            borderRadius: 12,
+            backgroundColor: "rgba(205,87,106,0.08)",
+            border: "1px solid rgba(205,87,106,0.18)",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 10,
+          }}
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            style={{ color: C.rose, flexShrink: 0, marginTop: 2 }}
+          >
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8" />
+            <path d="M12 8v4m0 4h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13,
+              color: C.rose,
+              fontWeight: 500,
+              lineHeight: 1.5,
+            }}
+          >
+            {banner.message}
+          </p>
+        </div>
+      )}
 
       {/* ── Section heading ─────────────────────────── */}
       <div style={{ padding: "24px 20px 8px", animation: "fadeIn 0.3s ease" }}>

@@ -187,3 +187,20 @@ export async function getToppings(): Promise<ToppingGroup[]> {
 export async function saveToppings(groups: ToppingGroup[]): Promise<void> {
   await setDoc(doc(db, "settings", "toppings"), { groups });
 }
+
+// ── Banner ─────────────────────────────────────────────────
+
+export interface BannerSettings {
+  enabled: boolean;
+  message: string;
+}
+
+export async function getBanner(): Promise<BannerSettings> {
+  const snap = await getDoc(doc(db, "settings", "banner"));
+  if (!snap.exists()) return { enabled: false, message: "" };
+  return snap.data() as BannerSettings;
+}
+
+export async function saveBanner(banner: BannerSettings): Promise<void> {
+  await setDoc(doc(db, "settings", "banner"), banner);
+}
