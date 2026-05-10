@@ -341,7 +341,16 @@ interface LoyaltyCard {
 
 ## Panel admin (`/admin`)
 
-Protegido por PIN via server action (`actions.ts` → `validateAdminPin()`). El `ADMIN_PIN` vive en el servidor y nunca se expone al cliente.
+Protegido por PIN via server action (`actions.ts` → `validateAdminPin()`). El `ADMIN_PIN` vive en el servidor y nunca se expone al cliente — la action solo devuelve `true/false`.
+
+### Sesion persistente
+
+La sesion usa `localStorage` con expiración de **30 días** (no `sessionStorage`). Las funciones viven en `src/app/admin/page.tsx` y se importan desde el layout:
+
+- `setAdminSession()` — guarda `{ v: "1", exp: timestamp }` al hacer login exitoso
+- `checkAdminSession()` — verifica existencia y vigencia del token; lo elimina si expiró
+
+El layout (`(panel)/layout.tsx`) llama `checkAdminSession()` en el `useEffect` inicial y redirige a `/admin` si falla. No usar `sessionStorage` — se borra al cerrar la pestaña.
 
 El layout (`src/app/admin/(panel)/layout.tsx`) incluye:
 - **Sidebar** en desktop (220px, fijo a la izquierda)

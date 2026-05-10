@@ -4,7 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { BarChart2, Heart, UtensilsCrossed, Receipt, ClipboardList } from "lucide-react";
 import logoPink from "@/assets/images/logo-pink.png";
-import { checkAdminSession } from "../page";
+import { checkAdminSession } from "../session";
 
 const NAV = [
   { href: "/admin/comanda", label: "Comanda", icon: ClipboardList },
