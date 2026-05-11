@@ -147,7 +147,7 @@ export default function LoyaltyPage() {
     const phone = currentPhone || normalizePhone(searchPhone);
     const cardUrl = `${window.location.origin}/mi-tarjeta?tel=${phone}`;
     const msg = encodeURIComponent(
-      `Hola! Tu pedido fue entregado.\n\nYa tienes tu flor registrada en tu tarjeta de fidelidad de Te Sueno. Con ${STAMPS_FOR_FREE} pedidos ganas una bebida gratis.\n\nVe tu tarjeta aqui: ${cardUrl}`
+      `Hola! 🫢 Tu pedido fue entregado.\n\nYa tienes tu flor registrada en tu tarjeta de fidelidad de Té Sueño 🌸. Con ${STAMPS_FOR_FREE} pedidos ganas una bebida gratis.\n\nVe tu tarjeta aqui: ${cardUrl}`
     );
     window.open(`https://wa.me/52${phone}?text=${msg}`, "_blank");
   }
