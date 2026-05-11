@@ -21,7 +21,7 @@ export interface Expense {
   amount: number;
   paymentMethod: PaymentMethod;
   cardName?: string;           // nombre de la tarjeta (ej. "BBVA", "Banamex")
-  cardDueDay?: number;         // día del mes en que se paga (ej. 15)
+  cardDueDay?: number;         // legacy: día del mes en que se paga
   cardDueDate?: Timestamp;     // legacy: fecha específica de pago
   cardPaid?: boolean;
   // meses sin intereses
@@ -29,7 +29,8 @@ export interface Expense {
   firstPaymentMonth?: string;  // mes de primer pago "YYYY-MM" (ej. "2026-06")
   installmentsPaid?: number;   // legacy: contador simple
   paidMonths?: string[];       // meses pagados como "YYYY-MM" (ej. ["2026-05", "2026-06"])
-  timestamp: Timestamp;
+  purchaseDate?: Timestamp;    // fecha real de la compra (solo TDC nuevos)
+  timestamp: Timestamp;        // cash = fecha compra; TDC = fecha de pago (usado para filtros)
 }
 
 export async function getExpenses(from?: Date, to?: Date, limitCount?: number): Promise<Expense[]> {

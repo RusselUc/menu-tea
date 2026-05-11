@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { CalendarIcon, RefreshCw, Megaphone, Check, X, Copy, MessageCircle, Pencil } from "lucide-react";
 import { type DateRange } from "react-day-picker";
 import { format } from "date-fns";
@@ -77,9 +78,9 @@ const ALL_LIMIT = 500;
 function getDateBounds(period: Period, dateRange?: DateRange): { from?: Date; to?: Date; limitCount?: number } {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (period === "today") return { from: today };
-  if (period === "week")  { const d = new Date(today); d.setDate(d.getDate() - 6); return { from: d }; }
-  if (period === "month") { const d = new Date(today); d.setDate(d.getDate() - 29); return { from: d }; }
+  if (period === "today") return { from: today, to: today };
+  if (period === "week")  { const d = new Date(today); d.setDate(d.getDate() - 6); return { from: d, to: today }; }
+  if (period === "month") { const d = new Date(today); d.setDate(d.getDate() - 29); return { from: d, to: today }; }
   if (period === "range") return { from: dateRange?.from, to: dateRange?.to };
   return { limitCount: ALL_LIMIT };
 }
@@ -124,7 +125,7 @@ function computeStats(orders: Order[], period: Period, dateRange?: DateRange) {
           }).length,
         };
       });
-    } else {
+    } else if (diffDays <= 90) {
       const weeks = Math.ceil(diffDays / 7);
       chartData = Array.from({ length: weeks }, (_, i) => {
         const wStart = new Date(from); wStart.setDate(wStart.getDate() + i * 7);
@@ -137,6 +138,24 @@ function computeStats(orders: Order[], period: Period, dateRange?: DateRange) {
           count: allActive.filter((o) => {
             const od = o.timestamp?.toDate();
             return od && od >= wStart && od < wEnd;
+          }).length,
+        };
+      });
+    } else {
+      // Rango grande: agrupar por mes
+      const months: Date[] = [];
+      let cur = new Date(from.getFullYear(), from.getMonth(), 1);
+      const toMonth = new Date(to.getFullYear(), to.getMonth(), 1);
+      while (cur <= toMonth) { months.push(new Date(cur)); cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1); }
+      chartData = months.map((m) => {
+        const mEnd = new Date(m.getFullYear(), m.getMonth() + 1, 1);
+        const isToday = todayStart >= m && todayStart < mEnd;
+        const label = m.toLocaleDateString("es-MX", { month: "short" }).slice(0, 3);
+        return {
+          label, isToday,
+          count: allActive.filter((o) => {
+            const od = o.timestamp?.toDate();
+            return od && od >= m && od < mEnd;
           }).length,
         };
       });
@@ -226,32 +245,39 @@ function StatCard({
   );
 }
 
-function BarChart({ data }: { data: { label: string; count: number; isToday: boolean }[] }) {
-  const max = Math.max(...data.map((d) => d.count), 1);
+function OrdersBarChart({ data }: { data: { label: string; count: number; isToday: boolean }[] }) {
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 120 }}>
-      {data.map((d, i) => (
-        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, height: "100%" }}>
-          {d.count > 0 && (
-            <span style={{ fontSize: 11, color: d.isToday ? T.blue : T.muted, fontWeight: 600, lineHeight: 1 }}>
-              {d.count}
-            </span>
-          )}
-          <div style={{ flex: 1, width: "100%", display: "flex", alignItems: "flex-end" }}>
-            <div style={{
-              width: "100%",
-              height: d.count > 0 ? `${Math.max((d.count / max) * 100, 6)}%` : "4px",
-              background: d.isToday ? T.blue : d.count > 0 ? "#BFDBFE" : "#F1F5F9",
-              borderRadius: "4px 4px 3px 3px",
-              minHeight: d.count > 0 ? 6 : 4,
-            }} />
-          </div>
-          <span style={{ fontSize: 10, color: d.isToday ? T.blue : T.mutedLight, fontWeight: d.isToday ? 600 : 400 }}>
-            {d.label}
-          </span>
-        </div>
-      ))}
-    </div>
+    <ResponsiveContainer width="100%" height={140}>
+      <BarChart data={data} margin={{ top: 10, right: 4, left: -28, bottom: 0 }} barCategoryGap="30%">
+        <XAxis
+          dataKey="label"
+          tick={{ fontSize: 10, fill: T.mutedLight, fontFamily: "var(--font-poppins)" }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          allowDecimals={false}
+          tick={{ fontSize: 10, fill: T.mutedLight, fontFamily: "var(--font-poppins)" }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <Tooltip
+          cursor={{ fill: T.slate }}
+          contentStyle={{
+            borderRadius: 8, border: `1px solid ${T.border}`,
+            fontSize: 12, fontFamily: "var(--font-poppins)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          }}
+          formatter={(value) => [value, "Pedidos"]}
+          labelStyle={{ color: T.text, fontWeight: 600 }}
+        />
+        <Bar dataKey="count" radius={[4, 4, 3, 3]}>
+          {data.map((d, i) => (
+            <Cell key={i} fill={d.isToday ? T.blue : "#BFDBFE"} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -704,7 +730,7 @@ export default function DashboardPage() {
                 <span style={{ fontSize: 12, color: T.mutedLight }}>Cargando...</span>
               </div>
             ) : (
-              <BarChart data={chartData} />
+              <OrdersBarChart data={chartData} />
             )}
           </div>
 

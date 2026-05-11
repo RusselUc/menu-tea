@@ -68,9 +68,9 @@ function todayDateString() {
 function getDateBounds(period: Period, dateRange?: DateRange): { from?: Date; to?: Date; limitCount?: number } {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (period === "today") return { from: today };
-  if (period === "week")  { const d = new Date(today); d.setDate(d.getDate() - 6); return { from: d }; }
-  if (period === "month") { const d = new Date(today); d.setDate(d.getDate() - 29); return { from: d }; }
+  if (period === "today") return { from: today, to: today };
+  if (period === "week")  { const d = new Date(today); d.setDate(d.getDate() - 6); return { from: d, to: today }; }
+  if (period === "month") { const d = new Date(today); d.setDate(d.getDate() - 29); return { from: d, to: today }; }
   if (period === "range") return { from: dateRange?.from, to: dateRange?.to };
   return { limitCount: 500 };
 }
@@ -81,56 +81,46 @@ function formatDate(ts: { toDate: () => Date }): string {
 
 // ── Form types & helpers ──────────────────────────────────
 const INSTALLMENT_OPTIONS = [3, 6, 9, 12, 18, 24];
-const CARD_OPTIONS = ["BBVA", "Banamex", "Santander", "HSBC", "Banorte", "Amex"];
-
-function defaultFirstPaymentMonth(dueDay: number): string {
-  const now = new Date();
-  // Si el día de pago ya pasó este mes, el primer pago es el mes siguiente
-  const d = now.getDate() >= dueDay
-    ? new Date(now.getFullYear(), now.getMonth() + 1, 1)
-    : new Date(now.getFullYear(), now.getMonth(), 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
 
 const EMPTY = {
   description: "", amount: "", paymentMethod: "cash" as PaymentMethod,
-  cardName: "", cardDueDay: "15", date: todayDateString(),
+  cardName: "", paymentDate: "", date: todayDateString(),
   useInstallments: false, installments: "12",
-  firstPaymentMonth: defaultFirstPaymentMonth(15),
 };
 
 type ExpenseForm = typeof EMPTY;
 
 function expenseToForm(exp: Expense): ExpenseForm {
-  const d = exp.timestamp?.toDate();
-  const dateStr = d
-    ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-    : todayDateString();
-  const dueDay = exp.cardDueDay
-    ? String(exp.cardDueDay)
-    : exp.cardDueDate
-      ? String(exp.cardDueDate.toDate().getDate())
-      : "15";
-  const firstPaymentMonth = exp.firstPaymentMonth
-    ?? defaultFirstPaymentMonth(parseInt(dueDay));
+  function tsToDateStr(ts: { toDate: () => Date } | undefined): string {
+    const d = ts?.toDate();
+    if (!d) return todayDateString();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
+  // Si existe purchaseDate es un registro nuevo: purchaseDate = compra, timestamp = pago
+  // Si no, es legacy: timestamp = compra (sin fecha de pago separada)
+  const purchaseDateStr = tsToDateStr(exp.purchaseDate ?? exp.timestamp);
+  let paymentDateStr = "";
+  if (exp.purchaseDate) {
+    // Nuevo formato: timestamp tiene la fecha de pago
+    paymentDateStr = tsToDateStr(exp.timestamp);
+  } else if (exp.paymentMethod === "card" && exp.cardDueDay && exp.firstPaymentMonth) {
+    // Legacy: reconstruir desde firstPaymentMonth + cardDueDay
+    const [ly, lm] = exp.firstPaymentMonth.split("-").map(Number);
+    const legacyPay = new Date(ly, lm - 1, exp.cardDueDay);
+    paymentDateStr = `${legacyPay.getFullYear()}-${String(legacyPay.getMonth() + 1).padStart(2, "0")}-${String(legacyPay.getDate()).padStart(2, "0")}`;
+  }
+
   return {
     description: exp.description,
     amount: String(exp.amount),
     paymentMethod: exp.paymentMethod,
     cardName: exp.cardName ?? "",
-    cardDueDay: dueDay,
-    date: dateStr,
+    date: purchaseDateStr,
+    paymentDate: paymentDateStr,
     useInstallments: !!(exp.installments && exp.installments > 1),
     installments: exp.installments ? String(exp.installments) : "12",
-    firstPaymentMonth,
   };
-}
-
-// Calcula la próxima fecha de pago dado el día del mes
-function getNextDueDate(dueDay: number): Date {
-  const now = new Date();
-  const thisMonth = new Date(now.getFullYear(), now.getMonth(), dueDay);
-  return thisMonth > now ? thisMonth : new Date(now.getFullYear(), now.getMonth() + 1, dueDay);
 }
 
 // Genera los meses de pago dado el mes inicial "YYYY-MM", N meses y el día de pago
@@ -165,10 +155,6 @@ function ExpenseFormFields({ form, setForm, saving, onCancel, submitLabel }: {
 
   const monthlyAmount = form.useInstallments && form.amount && parseInt(form.installments) > 0
     ? (parseFloat(form.amount) / parseInt(form.installments)).toFixed(2)
-    : null;
-
-  const nextDue = form.paymentMethod === "card" && form.cardDueDay
-    ? getNextDueDate(parseInt(form.cardDueDay))
     : null;
 
   return (
@@ -230,72 +216,26 @@ function ExpenseFormFields({ form, setForm, saving, onCancel, submitLabel }: {
           display: "flex", flexDirection: "column", gap: 14,
         }}>
           {/* Nombre de tarjeta */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <label style={{ ...labelStyle, color: T.purple }}>Tarjeta</label>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {CARD_OPTIONS.map((c) => (
-                <button key={c} type="button"
-                  onClick={() => setForm((f) => ({ ...f, cardName: f.cardName === c ? "" : c }))}
-                  style={{
-                    height: 30, padding: "0 12px", borderRadius: 100,
-                    border: `1px solid ${form.cardName === c ? T.purple : T.purpleBorder}`,
-                    background: form.cardName === c ? T.purple : T.white,
-                    color: form.cardName === c ? T.white : T.purple,
-                    fontSize: 12, fontWeight: 600, cursor: "pointer",
-                    fontFamily: "var(--font-poppins)", transition: "all 0.12s",
-                  }}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ ...labelStyle, color: T.purple }}>Nombre de tarjeta</label>
             <input
-              placeholder="Otra (escribe el nombre)"
-              value={CARD_OPTIONS.includes(form.cardName) ? "" : form.cardName}
+              placeholder="Ej. BBVA, Banamex, Amex..."
+              value={form.cardName}
               onChange={(e) => setForm((f) => ({ ...f, cardName: e.target.value }))}
-              style={{ ...inputStyle, borderColor: T.purpleBorder, fontSize: 12 }}
+              style={{ ...inputStyle, borderColor: T.purpleBorder }}
             />
           </div>
 
-          {/* Día de pago mensual */}
+          {/* Fecha de pago */}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ ...labelStyle, color: T.purple }}>Día de pago cada mes</label>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <input
-                type="number" min={1} max={31}
-                value={form.cardDueDay}
-                onChange={(e) => setForm((f) => ({ ...f, cardDueDay: e.target.value }))}
-                style={{ ...inputStyle, width: 80, borderColor: T.purpleBorder }}
-              />
-              {nextDue && (
-                <span style={{ fontSize: 12, color: T.purple }}>
-                  Próximo pago: <strong>{nextDue.toLocaleDateString("es-MX", { day: "numeric", month: "long" })}</strong>
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Mes de primer pago */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ ...labelStyle, color: T.purple }}>Mes de primer pago</label>
+            <label style={{ ...labelStyle, color: T.purple }}>Fecha de pago</label>
             <input
-              type="month"
-              value={form.firstPaymentMonth}
-              onChange={(e) => setForm((f) => ({ ...f, firstPaymentMonth: e.target.value }))}
-              min={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`}
-              style={{ ...inputStyle, width: "auto", borderColor: T.purpleBorder }}
+              type="date"
+              value={form.paymentDate}
+              onChange={(e) => setForm((f) => ({ ...f, paymentDate: e.target.value }))}
+              style={{ ...inputStyle, borderColor: T.purpleBorder }}
+              required
             />
-            {form.firstPaymentMonth && form.cardDueDay && (
-              <p style={{ margin: 0, fontSize: 12, color: T.purple }}>
-                Primer pago: <strong>
-                  {new Date(
-                    parseInt(form.firstPaymentMonth.split("-")[0]),
-                    parseInt(form.firstPaymentMonth.split("-")[1]) - 1,
-                    parseInt(form.cardDueDay)
-                  ).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}
-                </strong>
-              </p>
-            )}
           </div>
 
           {/* Toggle meses sin intereses */}
@@ -378,11 +318,11 @@ function ExpenseFormFields({ form, setForm, saving, onCancel, submitLabel }: {
         }}>
           Cancelar
         </button>
-        <button type="submit" disabled={saving || !form.description.trim() || !form.amount} style={{
+        <button type="submit" disabled={saving || !form.description.trim() || !form.amount || (form.paymentMethod === "card" && !form.paymentDate)} style={{
           height: 40, padding: "0 20px", borderRadius: 8, border: "none",
           background: T.text, color: T.white, fontSize: 13, fontWeight: 600,
           cursor: "pointer", fontFamily: "var(--font-poppins)",
-          opacity: saving || !form.description.trim() || !form.amount ? 0.5 : 1,
+          opacity: saving || !form.description.trim() || !form.amount || (form.paymentMethod === "card" && !form.paymentDate) ? 0.5 : 1,
           transition: "opacity 0.15s",
         }}>
           {saving ? "Guardando..." : submitLabel}
@@ -507,23 +447,30 @@ export default function GastosPage() {
   async function handleSave(form: ExpenseForm) {
     const { Timestamp } = await import("firebase/firestore");
     const [year, month, day] = form.date.split("-").map(Number);
-    const expenseDate = new Date(year, month - 1, day, 12, 0, 0);
+    const purchaseDateObj = new Date(year, month - 1, day, 12, 0, 0);
 
     const data: Omit<Expense, "id"> = {
       description: form.description.trim(),
       amount: parseFloat(form.amount),
       paymentMethod: form.paymentMethod,
-      timestamp: Timestamp.fromDate(expenseDate),
+      timestamp: Timestamp.fromDate(purchaseDateObj),
     };
 
     if (form.paymentMethod === "card") {
+      const [py, pm, pd] = form.paymentDate.split("-").map(Number);
+      const paymentDateObj = new Date(py, pm - 1, pd, 12, 0, 0);
+
+      // timestamp = fecha de pago (para filtros por periodo)
+      // purchaseDate = fecha real de la compra (para display)
+      data.timestamp = Timestamp.fromDate(paymentDateObj);
+      data.purchaseDate = Timestamp.fromDate(purchaseDateObj);
       data.cardName = form.cardName.trim() || undefined;
-      data.cardDueDay = parseInt(form.cardDueDay) || 15;
+      // Derivar cardDueDay y firstPaymentMonth de la fecha de pago (necesarios para MSI)
+      data.cardDueDay = pd;
+      data.firstPaymentMonth = `${py}-${String(pm).padStart(2, "0")}`;
       if (!editingExpense) data.cardPaid = false;
-      if (form.firstPaymentMonth) data.firstPaymentMonth = form.firstPaymentMonth;
       if (form.useInstallments && parseInt(form.installments) > 1) {
         data.installments = parseInt(form.installments);
-        data.firstPaymentMonth = form.firstPaymentMonth;
         if (!editingExpense) data.installmentsPaid = 0;
       }
     }
@@ -851,13 +798,13 @@ export default function GastosPage() {
               {displayed.map((exp, idx) => {
                 const isCard = exp.paymentMethod === "card";
                 const now = new Date();
-                // Usar cardDueDay (nuevo) o cardDueDate (legacy)
-                const nextDue = isCard && exp.cardDueDay
-                  ? getNextDueDate(exp.cardDueDay)
-                  : exp.cardDueDate?.toDate() ?? null;
-                const isOverdue = isCard && !exp.cardPaid && nextDue && nextDue < now;
-                const isDueSoon = isCard && !exp.cardPaid && nextDue && nextDue >= now &&
-                  nextDue <= new Date(now.getTime() + 7 * 86400000);
+                // Para TDC nuevos: timestamp = fecha de pago. Para legacy: cardDueDate o null.
+                const paymentDateObj = isCard
+                  ? (exp.purchaseDate ? exp.timestamp?.toDate() : exp.cardDueDate?.toDate()) ?? null
+                  : null;
+                const isOverdue = isCard && !exp.cardPaid && paymentDateObj && paymentDateObj < now;
+                const isDueSoon = isCard && !exp.cardPaid && paymentDateObj && paymentDateObj >= now &&
+                  paymentDateObj <= new Date(now.getTime() + 7 * 86400000);
                 const isDeleting = deletingId === exp.id;
                 const isToggling = togglingId === exp.id;
                 const hasInstallments = isCard && exp.installments && exp.installments > 1;
@@ -865,9 +812,8 @@ export default function GastosPage() {
                 const installmentsPaidCount = paidMonths.length;
                 const installmentsLeft = hasInstallments ? exp.installments! - installmentsPaidCount : 0;
                 const monthlyAmount = hasInstallments ? exp.amount / exp.installments! : 0;
-                const firstPaymentMonth = exp.firstPaymentMonth
-                  ?? defaultFirstPaymentMonth(exp.cardDueDay ?? 15);
-                const installmentMonths = hasInstallments && exp.cardDueDay
+                const firstPaymentMonth = exp.firstPaymentMonth ?? null;
+                const installmentMonths = hasInstallments && firstPaymentMonth && exp.cardDueDay
                   ? getInstallmentMonths(firstPaymentMonth, exp.installments!, exp.cardDueDay)
                   : [];
                 const isPickerOpen = payingMonthId === exp.id;
@@ -936,13 +882,10 @@ export default function GastosPage() {
                         )}
                       </div>
                       <p style={{ margin: 0, fontSize: 11.5, color: T.mutedLight }}>
-                        {exp.timestamp ? formatDate(exp.timestamp) : ""}
-                        {isCard && exp.cardDueDay && (
-                          <> · pago día {exp.cardDueDay} de cada mes</>
-                        )}
-                        {isCard && !exp.cardDueDay && nextDue && (
-                          <> · vence el {nextDue.toLocaleDateString("es-MX", { day: "numeric", month: "short" })}</>
-                        )}
+                        {exp.purchaseDate
+                          ? <>Compra: {formatDate(exp.purchaseDate)} · Pago: {formatDate(exp.timestamp)}</>
+                          : exp.timestamp ? formatDate(exp.timestamp) : ""
+                        }
                         {hasInstallments && !exp.cardPaid && (
                           <> · siguiente: ${monthlyAmount.toFixed(0)}</>
                         )}
