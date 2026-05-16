@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { CalendarIcon, RefreshCw, Megaphone, Check, X, Copy, MessageCircle, Pencil } from "lucide-react";
+import { CalendarIcon, RefreshCw, Megaphone, Check, X, Copy, MessageCircle, Pencil, RotateCcw } from "lucide-react";
 import { type DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -305,9 +305,23 @@ export default function DashboardPage() {
   const [bannerSaved, setBannerSaved] = useState(false);
   const [editingBanner, setEditingBanner] = useState(false);
 
+  // Ruleta counter state
+  const [ruletaCount, setRuletaCount] = useState(0);
+  const [ruletaReset, setRuletaReset] = useState(false);
+
   useEffect(() => {
     getBanner().then((b) => { setBanner(b); setBannerDraft(b); });
+    const key = "ruleta_" + new Date().toISOString().slice(0, 10);
+    setRuletaCount(parseInt(localStorage.getItem(key) ?? "0", 10));
   }, []);
+
+  function handleResetRuleta() {
+    const key = "ruleta_" + new Date().toISOString().slice(0, 10);
+    localStorage.setItem(key, "0");
+    setRuletaCount(0);
+    setRuletaReset(true);
+    setTimeout(() => setRuletaReset(false), 2000);
+  }
 
   async function handleToggleBanner() {
     const newDraft = { ...bannerDraft, enabled: !bannerDraft.enabled };
@@ -595,6 +609,41 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Ruleta counter reset */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "10px 14px", background: T.white,
+            border: `1px solid ${T.border}`, borderRadius: 10,
+          }}>
+            <RotateCcw size={14} style={{ color: T.muted, flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: 13, color: T.text }}>
+              Ruleta — bebidas gratis hoy
+            </span>
+            <span style={{
+              fontSize: 13, fontWeight: 700, color: ruletaCount > 0 ? T.text : T.mutedLight,
+              minWidth: 28, textAlign: "right",
+            }}>
+              {ruletaCount} / 2
+            </span>
+            <button
+              onClick={handleResetRuleta}
+              disabled={ruletaCount === 0}
+              style={{
+                height: 28, padding: "0 10px", borderRadius: 6,
+                border: `1px solid ${T.border}`,
+                background: ruletaReset ? T.greenBg : T.white,
+                color: ruletaReset ? T.green : ruletaCount === 0 ? T.mutedLight : T.secondary,
+                fontSize: 12, fontWeight: 600, cursor: ruletaCount === 0 ? "default" : "pointer",
+                fontFamily: "var(--font-poppins)", display: "flex", alignItems: "center", gap: 4,
+                transition: "background 0.2s, color 0.2s",
+              }}
+            >
+              {ruletaReset ? <><Check size={12} /> Reiniciado</> : "Reiniciar"}
+            </button>
+          </div>
         </div>
 
         {/* Period filter tabs */}
