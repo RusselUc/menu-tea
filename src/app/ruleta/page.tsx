@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Trophy, Star, ArrowRight, RefreshCcw } from "lucide-react";
+import { subscribeToRuletaCount, incrementRuletaCount } from "@/lib/menu-items";
 
 // ── Wheel config ──────────────────────────────────────────
 const WHEEL_SIZE = 308;
@@ -21,14 +22,6 @@ const N           = SEGMENTS.length;
 const MAX_PRIZES  = 2;
 const SPIN_MS     = 5000;
 const EXTRA_SPINS = 7;
-
-// ── Persistence ───────────────────────────────────────────
-function todayKey() { return "ruleta_" + new Date().toISOString().slice(0, 10); }
-function readCount(): number {
-  if (typeof window === "undefined") return 0;
-  return parseInt(localStorage.getItem(todayKey()) ?? "0", 10);
-}
-function saveCount(n: number) { localStorage.setItem(todayKey(), String(n)); }
 
 // ── Canvas draw ───────────────────────────────────────────
 function drawWheel(ctx: CanvasRenderingContext2D, size: number) {
@@ -79,7 +72,8 @@ export default function RuletaPage() {
   const [lossLabel,   setLossLabel]  = useState("");
   const [winExiting,  setWinExiting] = useState(false);
 
-  useEffect(() => { setPrizeCount(readCount()); }, []);
+  // Sync prize count from Firestore in real time (reacts to admin resets)
+  useEffect(() => subscribeToRuletaCount(setPrizeCount), []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -129,9 +123,7 @@ export default function RuletaPage() {
     setTimeout(() => {
       if (wheelRef.current) wheelRef.current.style.transition = "none";
       if (win) {
-        const next = prizeCount + 1;
-        saveCount(next);
-        setPrizeCount(next);
+        incrementRuletaCount();
         setPhase("won");
       } else {
         setLossLabel(seg.label.join(" "));

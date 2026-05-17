@@ -8,6 +8,8 @@ import {
   deleteDoc,
   query,
   orderBy,
+  onSnapshot,
+  increment,
 } from "firebase/firestore";
 import { db } from "./firebase";
 export { uploadMenuImageSupabase } from "./supabase";
@@ -203,4 +205,33 @@ export async function getBanner(): Promise<BannerSettings> {
 
 export async function saveBanner(banner: BannerSettings): Promise<void> {
   await setDoc(doc(db, "settings", "banner"), banner);
+}
+
+// ── Ruleta prize counter — settings/ruleta ────────────────
+// { count: number, date: "YYYY-MM-DD" }
+// count auto-resets to 0 when date changes.
+
+function ruletaToday() { return new Date().toISOString().slice(0, 10); }
+const RULETA_REF = () => doc(db, "settings", "ruleta");
+
+export function subscribeToRuletaCount(cb: (count: number) => void): () => void {
+  return onSnapshot(RULETA_REF(), (snap) => {
+    if (!snap.exists()) { cb(0); return; }
+    const { count, date } = snap.data() as { count: number; date: string };
+    cb(date === ruletaToday() ? count : 0);
+  });
+}
+
+export async function incrementRuletaCount(): Promise<void> {
+  const today = ruletaToday();
+  const snap  = await getDoc(RULETA_REF());
+  if (!snap.exists() || (snap.data() as { date: string }).date !== today) {
+    await setDoc(RULETA_REF(), { count: 1, date: today });
+  } else {
+    await updateDoc(RULETA_REF(), { count: increment(1) });
+  }
+}
+
+export async function resetRuletaCount(): Promise<void> {
+  await setDoc(RULETA_REF(), { count: 0, date: ruletaToday() });
 }

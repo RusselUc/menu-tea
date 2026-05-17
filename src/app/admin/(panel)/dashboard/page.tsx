@@ -16,7 +16,7 @@ import {
   OrderStatus,
 } from "@/lib/orders";
 import { getExpenses, Expense } from "@/lib/expenses";
-import { getBanner, saveBanner, BannerSettings } from "@/lib/menu-items";
+import { getBanner, saveBanner, BannerSettings, subscribeToRuletaCount, resetRuletaCount } from "@/lib/menu-items";
 
 // ── Tokens ─────────────────────────────────────────────
 const T = {
@@ -311,14 +311,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     getBanner().then((b) => { setBanner(b); setBannerDraft(b); });
-    const key = "ruleta_" + new Date().toISOString().slice(0, 10);
-    setRuletaCount(parseInt(localStorage.getItem(key) ?? "0", 10));
   }, []);
 
-  function handleResetRuleta() {
-    const key = "ruleta_" + new Date().toISOString().slice(0, 10);
-    localStorage.setItem(key, "0");
-    setRuletaCount(0);
+  // Sync ruleta count from Firestore in real time
+  useEffect(() => subscribeToRuletaCount(setRuletaCount), []);
+
+  async function handleResetRuleta() {
+    await resetRuletaCount();
     setRuletaReset(true);
     setTimeout(() => setRuletaReset(false), 2000);
   }
