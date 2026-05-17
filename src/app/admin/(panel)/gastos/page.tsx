@@ -70,7 +70,11 @@ function getDateBounds(period: Period, dateRange?: DateRange): { from?: Date; to
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if (period === "today") return { from: today, to: today };
   if (period === "week")  { const d = new Date(today); d.setDate(d.getDate() - 6); return { from: d, to: today }; }
-  if (period === "month") { const d = new Date(today); d.setDate(d.getDate() - 29); return { from: d, to: today }; }
+  if (period === "month") {
+    const from = new Date(today.getFullYear(), today.getMonth(), 1);
+    const to   = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    return { from, to };
+  }
   if (period === "range") return { from: dateRange?.from, to: dateRange?.to };
   return { limitCount: 500 };
 }
@@ -684,7 +688,7 @@ export default function GastosPage() {
               </PopoverTrigger>
               <PopoverContent align="start" style={{ width: "auto", padding: 0 }}>
                 <Calendar mode="range" selected={dateRange} onSelect={setDateRange}
-                  numberOfMonths={2} disabled={{ after: new Date() }} locale={es} initialFocus />
+                  numberOfMonths={2} locale={es} initialFocus />
               </PopoverContent>
             </Popover>
             <button
