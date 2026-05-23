@@ -206,7 +206,7 @@ const Menu = () => {
           padding: "0 20px", height: 58,
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <img src={logoPink.src} alt="Té Sueño" style={{ height: 34, width: "auto" }} />
+          <Image src={logoPink} alt="Té Sueño" height={34} style={{ width: "auto" }} />
           <div style={{
             height: 28, padding: "0 10px",
             borderRadius: 100,
