@@ -5,16 +5,20 @@ import { Flavor, SizeId, sizes, priceRules as staticPriceRules } from "@/data/me
 import { ToppingGroup, ToppingItem, DEFAULT_TOPPINGS } from "@/lib/menu-items";
 import { Minus, Plus } from "lucide-react";
 
-const C = {
-  dark: "#CD576A", // deep forest green
-  olive: "#79874C", // olive green
-  rose: "#CD576A", // rose accent
-  pink: "#F298AA", // blush pink
-  cream: "#F8F5F1", // soft warm white
-  white: "#FFFFFF",
-  text: "#2A2019",
-  muted: "#8A7A6E",
-  border: "rgba(59,89,53,0.1)",
+const T = {
+  bg:          "#F8FAFC",
+  white:       "#FFFFFF",
+  border:      "#E2E8F0",
+  text:        "#0F172A",
+  secondary:   "#334155",
+  muted:       "#64748B",
+  mutedLight:  "#94A3B8",
+  slate:       "#F1F5F9",
+  rose:        "#CD576A",
+  roseBg:      "#FFF1F2",
+  roseBorder:  "#FECDD3",
+  roseDeep:    "#B8465A",
+  olive:       "#79874C",
 };
 
 interface BottomProductProps {
@@ -28,17 +32,12 @@ interface BottomProductProps {
 }
 
 const SectionLabel = ({ children }: { children: React.ReactNode }) => (
-  <p
-    style={{
-      margin: "0 0 10px",
-      fontSize: 11,
-      fontWeight: 600,
-      letterSpacing: "0.1em",
-      textTransform: "uppercase",
-      color: C.muted,
-      fontFamily: "var(--font-poppins)",
-    }}
-  >
+  <p style={{
+    margin: "0 0 10px",
+    fontSize: 11, fontWeight: 600,
+    letterSpacing: "0.1em", textTransform: "uppercase",
+    color: T.muted, fontFamily: "var(--font-poppins)",
+  }}>
     {children}
   </p>
 );
@@ -72,9 +71,7 @@ const BottomProduct: FC<BottomProductProps> = ({
 
   const getPriceWithToppings = () => {
     const base = getBasePrice();
-    return selectedToppings.length > 1
-      ? base + (selectedToppings.length - 1) * 10
-      : base;
+    return selectedToppings.length > 1 ? base + (selectedToppings.length - 1) * 10 : base;
   };
 
   const getTotalPrice = () => getPriceWithToppings() * quantity;
@@ -97,68 +94,48 @@ const BottomProduct: FC<BottomProductProps> = ({
   return (
     <Drawer open={isOpen} onOpenChange={onClose}>
       <DrawerContent
-        style={{ backgroundColor: C.cream, borderTop: `3px solid ${C.rose}` }}
+        style={{ backgroundColor: T.white, borderTop: `3px solid ${T.rose}` }}
         className="flex flex-col"
       >
-        {/* Rose accent top bar */}
-        <div
-          style={{
-            height: 4,
-            backgroundColor: C.rose,
-            borderRadius: "4px 4px 0 0",
-            margin: "0 0 0",
-          }}
-        />
+        <style>{`
+          .size-btn:hover { border-color: ${T.roseBorder} !important; }
+          .topping-btn:hover { border-color: ${T.roseBorder} !important; }
+          .add-btn:hover { background: ${T.roseDeep} !important; }
+          .add-btn { transition: background 0.15s; }
+          .qty-btn:hover { box-shadow: 0 0 0 2px ${T.roseBorder}; }
+        `}</style>
 
         {/* Handle */}
-        <div
-          style={{
-            width: 36,
-            height: 3,
-            borderRadius: 2,
-            backgroundColor: C.border,
-            margin: "10px auto 0",
-          }}
-        />
+        <div style={{
+          width: 36, height: 3, borderRadius: 2,
+          backgroundColor: T.border,
+          margin: "12px auto 0",
+        }} />
 
         <DrawerHeader style={{ paddingBottom: 0 }}>
-          <DrawerTitle
-            style={{
-              fontSize: 22,
-              fontWeight: 700,
-              letterSpacing: "-0.02em",
-              color: C.dark,
-              fontFamily: "var(--font-poppins)",
-            }}
-          >
+          <DrawerTitle style={{
+            fontSize: 22, fontWeight: 700,
+            letterSpacing: "-0.02em", color: T.text,
+            fontFamily: "var(--font-poppins)",
+          }}>
             {product?.name}
           </DrawerTitle>
-          <p
-            style={{
-              margin: "4px 0 0",
-              fontSize: 11,
-              fontWeight: 500,
-              color: C.olive,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              fontFamily: "var(--font-poppins)",
-            }}
-          >
+          <p style={{
+            margin: "4px 0 0", fontSize: 11, fontWeight: 500,
+            color: T.olive, letterSpacing: "0.1em",
+            textTransform: "uppercase", fontFamily: "var(--font-poppins)",
+          }}>
             {category.name}
           </p>
         </DrawerHeader>
 
         {/* Scrollable body */}
-        <div
-          style={{
-            padding: "16px 20px 0",
-            overflowY: "auto",
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            gap: 22,
-          }}
-        >
+        <div style={{
+          padding: "16px 20px 0",
+          overflowY: "auto", flex: 1,
+          display: "flex", flexDirection: "column", gap: 22,
+        }}>
+
           {/* Size */}
           <div>
             <SectionLabel>Tamaño</SectionLabel>
@@ -166,59 +143,31 @@ const BottomProduct: FC<BottomProductProps> = ({
               {sizes.map((size) => {
                 const active = selectedSize === size.id;
                 const price =
-                  getPrice(
-                    product as unknown as Flavor,
-                    size.id as SizeId,
-                    category.id,
-                    priceRules
-                  ) ?? size.price;
+                  getPrice(product as unknown as Flavor, size.id as SizeId, category.id, priceRules)
+                  ?? size.price;
                 return (
                   <button
                     key={size.id}
+                    className="size-btn"
                     onClick={() => setSelectedSize(size.id as SizeId)}
                     style={{
                       flex: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: 2,
-                      padding: "10px 6px",
-                      borderRadius: 14,
-                      border: active
-                        ? `2px solid ${C.dark}`
-                        : `2px solid ${C.border}`,
-                      background: active ? C.dark : C.white,
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                      padding: "10px 6px", borderRadius: 14,
+                      border: active ? `2px solid ${T.rose}` : `1.5px solid ${T.border}`,
+                      background: active ? T.roseBg : T.white,
                       cursor: "pointer",
                       transition: "all 0.18s ease",
                       fontFamily: "var(--font-poppins)",
                     }}
                   >
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: active ? "#FFF" : C.text,
-                      }}
-                    >
+                    <span style={{ fontSize: 12, fontWeight: 600, color: active ? T.rose : T.text }}>
                       {size.name.split(" ")[0]}
                     </span>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 300,
-                        color: active ? "rgba(255,255,255,0.6)" : C.muted,
-                      }}
-                    >
+                    <span style={{ fontSize: 10, fontWeight: 400, color: active ? T.rose : T.muted, opacity: 0.8 }}>
                       {size.name.match(/\(.*\)/)?.[0] ?? ""}
                     </span>
-                    <span
-                      style={{
-                        fontSize: 15,
-                        fontWeight: 700,
-                        color: active ? "#FFF" : C.dark,
-                        marginTop: 4,
-                      }}
-                    >
+                    <span style={{ fontSize: 15, fontWeight: 700, color: active ? T.rose : T.text, marginTop: 4 }}>
                       ${price}
                     </span>
                   </button>
@@ -228,28 +177,20 @@ const BottomProduct: FC<BottomProductProps> = ({
           </div>
 
           {/* Topping note */}
-          <div
-            style={{
-              padding: "9px 13px",
-              borderRadius: 12,
-              background: "rgba(205,87,106,0.06)",
-              border: "1px solid rgba(205,87,106,0.15)",
-            }}
-          >
-            <p
-              style={{
-                margin: 0,
-                fontSize: 11,
-                fontWeight: 400,
-                color: C.rose,
-                fontFamily: "var(--font-poppins)",
-                lineHeight: 1.5,
-              }}
-            >
+          <div style={{
+            padding: "9px 13px", borderRadius: 12,
+            background: T.roseBg,
+            border: `1px solid ${T.roseBorder}`,
+          }}>
+            <p style={{
+              margin: 0, fontSize: 11, fontWeight: 400,
+              color: T.rose, fontFamily: "var(--font-poppins)", lineHeight: 1.5,
+            }}>
               Incluye 1 topping gratis · Cada topping adicional +$10
             </p>
           </div>
 
+          {/* Toppings */}
           {toppingGroups.map((group) => {
             const visibleItems = group.items.filter((t: ToppingItem) => t.active && t.name);
             if (visibleItems.length === 0) return null;
@@ -262,15 +203,14 @@ const BottomProduct: FC<BottomProductProps> = ({
                     return (
                       <button
                         key={t.name}
+                        className="topping-btn"
                         onClick={() => toggleTopping(t.name)}
                         style={{
-                          padding: "6px 14px",
-                          borderRadius: 100,
-                          border: active ? `1.5px solid ${C.rose}` : `1.5px solid ${C.border}`,
-                          background: active ? C.rose : C.white,
-                          color: active ? "#FFF" : C.text,
-                          fontSize: 12,
-                          fontWeight: active ? 500 : 400,
+                          padding: "7px 15px", borderRadius: 100,
+                          border: active ? `1.5px solid ${T.rose}` : `1.5px solid ${T.border}`,
+                          background: active ? T.rose : T.white,
+                          color: active ? "#FFF" : T.secondary,
+                          fontSize: 12, fontWeight: active ? 600 : 400,
                           cursor: "pointer",
                           transition: "all 0.15s ease",
                           fontFamily: "var(--font-poppins)",
@@ -288,58 +228,42 @@ const BottomProduct: FC<BottomProductProps> = ({
           {/* Quantity */}
           <div>
             <SectionLabel>Cantidad</SectionLabel>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 24,
-                justifyContent: "center",
-              }}
-            >
+            <div style={{
+              display: "flex", alignItems: "center",
+              gap: 24, justifyContent: "center",
+            }}>
               <button
+                className="qty-btn"
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
                 disabled={quantity <= 1}
                 style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: "50%",
-                  border: `1.5px solid ${C.border}`,
-                  background: C.white,
-                  color: quantity <= 1 ? "#ccc" : C.dark,
+                  width: 38, height: 38, borderRadius: "50%",
+                  border: `1.5px solid ${T.border}`,
+                  background: T.white,
+                  color: quantity <= 1 ? T.mutedLight : T.rose,
                   cursor: quantity <= 1 ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "all 0.15s ease",
                 }}
               >
                 <Minus size={14} />
               </button>
-              <span
-                style={{
-                  fontSize: 24,
-                  fontWeight: 700,
-                  color: C.dark,
-                  minWidth: 32,
-                  textAlign: "center",
-                  fontFamily: "var(--font-poppins)",
-                }}
-              >
+              <span style={{
+                fontSize: 24, fontWeight: 700, color: T.text,
+                minWidth: 32, textAlign: "center",
+                fontFamily: "var(--font-poppins)",
+              }}>
                 {quantity}
               </span>
               <button
+                className="qty-btn"
                 onClick={() => setQuantity(quantity + 1)}
                 style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: "50%",
-                  border: "none",
-                  background: C.dark,
-                  color: "#FFF",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  width: 38, height: 38, borderRadius: "50%",
+                  border: "none", background: T.rose,
+                  color: "#FFF", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s ease",
                 }}
               >
                 <Plus size={14} />
@@ -349,31 +273,23 @@ const BottomProduct: FC<BottomProductProps> = ({
         </div>
 
         {/* Footer CTA */}
-        <div
-          style={{
-            padding: "14px 20px 32px",
-            borderTop: `1px solid ${C.border}`,
-            backgroundColor: C.cream,
-          }}
-        >
+        <div style={{
+          padding: "14px 20px 32px",
+          borderTop: `1px solid ${T.border}`,
+          backgroundColor: T.white,
+        }}>
           <button
+            className="add-btn"
             onClick={handleAdd}
             style={{
-              width: "100%",
-              height: 54,
-              borderRadius: 16,
-              border: "none",
-              background: C.dark,
-              color: "#FFF",
-              fontSize: 15,
-              fontWeight: 600,
+              width: "100%", height: 54, borderRadius: 14, border: "none",
+              background: T.rose, color: "#FFF",
+              fontSize: 15, fontWeight: 600,
               cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
               fontFamily: "var(--font-poppins)",
               letterSpacing: "-0.01em",
+              boxShadow: "0 2px 12px rgba(205,87,106,0.25)",
             }}
           >
             <Plus size={16} />

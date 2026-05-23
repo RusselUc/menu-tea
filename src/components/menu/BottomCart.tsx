@@ -1,24 +1,25 @@
-import { FC, useState } from "react";
+import { FC } from "react";
 import { CartItem } from ".";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../ui/drawer";
 import { Trash2 } from "lucide-react";
 import { saveFullOrder, getNextOrderNumber } from "@/lib/orders";
 
-const C = {
-  dark:   "#CD576A",
-  olive:  "#79874C",
-  rose:   "#CD576A",
-  pink:   "#F298AA",
-  cream:  "#F8F5F1",
-  white:  "#FFFFFF",
-  text:   "#2A2019",
-  muted:  "#8A7A6E",
-  border: "rgba(59,89,53,0.1)",
-  // WhatsApp
-  wa:        "#22C55E",
-  waDeep:    "#16A34A",
-  waBg:      "#F0FDF4",
-  waBorder:  "#BBF7D0",
+const T = {
+  bg:         "#F8FAFC",
+  white:      "#FFFFFF",
+  border:     "#E2E8F0",
+  text:       "#0F172A",
+  secondary:  "#334155",
+  muted:      "#64748B",
+  mutedLight: "#94A3B8",
+  slate:      "#F1F5F9",
+  rose:       "#CD576A",
+  roseBg:     "#FFF1F2",
+  roseBorder: "#FECDD3",
+  roseDeep:   "#B8465A",
+  olive:      "#79874C",
+  wa:         "#22C55E",
+  waDeep:     "#16A34A",
 };
 
 const WaIcon = ({ size = 17 }: { size?: number }) => (
@@ -59,8 +60,7 @@ const BottomCart: FC<BottomCartProps> = ({
         msg += `   • Toppings: ${item.toppings.join(", ")}\n`;
       msg += `   • Cantidad: ${item.quantity}\n\n`;
     });
-    msg += `Total: $${total.toFixed(2)}`;
-    msg += `\n\n¡Gracias!`;
+    msg += `Total: $${total.toFixed(2)}\n\n¡Gracias!`;
     return encodeURIComponent(msg);
   };
 
@@ -91,44 +91,38 @@ const BottomCart: FC<BottomCartProps> = ({
   return (
     <Drawer open={isOpen} onOpenChange={onClose}>
       <DrawerContent
-        style={{ backgroundColor: C.cream, borderTop: `3px solid ${C.rose}` }}
+        style={{ backgroundColor: T.white, borderTop: `3px solid ${T.rose}` }}
         className="flex flex-col"
       >
         <style>{`
-          .wa-send-btn:not(:disabled):hover {
-            background: ${C.waDeep} !important;
-          }
-          .wa-send-btn { transition: background 0.15s, box-shadow 0.15s; }
-          .clear-btn:hover { background: rgba(0,0,0,0.04) !important; }
+          .wa-send-btn:not(:disabled):hover { background: ${T.waDeep} !important; }
+          .wa-send-btn { transition: background 0.15s; }
+          .clear-btn:hover { background: ${T.slate} !important; }
           .clear-btn { transition: background 0.15s; }
+          .remove-btn:hover { color: #e05555 !important; }
+          .remove-btn { transition: color 0.15s; }
         `}</style>
 
         {/* Handle */}
         <div style={{
           width: 36, height: 3, borderRadius: 2,
-          backgroundColor: "rgba(0,0,0,0.12)",
+          backgroundColor: T.border,
           margin: "12px auto 0",
         }} />
 
         <DrawerHeader style={{ paddingBottom: 0 }}>
           <DrawerTitle style={{
-            fontSize: 22,
-            fontWeight: 700,
-            letterSpacing: "-0.02em",
-            color: C.dark,
+            fontSize: 22, fontWeight: 700,
+            letterSpacing: "-0.02em", color: T.text,
             fontFamily: "var(--font-poppins)",
           }}>
             Tu Orden
           </DrawerTitle>
           {items.length > 0 && (
             <p style={{
-              margin: "4px 0 0",
-              fontSize: 11,
-              fontWeight: 500,
-              color: C.olive,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              fontFamily: "var(--font-poppins)",
+              margin: "4px 0 0", fontSize: 11, fontWeight: 500,
+              color: T.olive, letterSpacing: "0.1em",
+              textTransform: "uppercase", fontFamily: "var(--font-poppins)",
             }}>
               {items.length} producto{items.length !== 1 ? "s" : ""}
             </p>
@@ -138,31 +132,23 @@ const BottomCart: FC<BottomCartProps> = ({
         <div style={{ padding: "12px 20px 0", overflowY: "auto", flex: 1 }}>
           {items.length === 0 ? (
             <div style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "52px 0",
-              gap: 10,
+              display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center",
+              padding: "52px 0", gap: 10,
             }}>
               <div style={{
                 width: 56, height: 56, borderRadius: "50%",
-                backgroundColor: "rgba(205,87,106,0.08)",
+                backgroundColor: T.roseBg,
+                border: `1px solid ${T.roseBorder}`,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 24,
               }}>
                 🧋
               </div>
-              <p style={{
-                margin: 0, fontSize: 16, fontWeight: 600,
-                color: C.dark, fontFamily: "var(--font-poppins)",
-              }}>
+              <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: T.text, fontFamily: "var(--font-poppins)" }}>
                 Carrito vacío
               </p>
-              <p style={{
-                margin: 0, fontSize: 12, fontWeight: 300,
-                color: C.muted, fontFamily: "var(--font-poppins)",
-              }}>
+              <p style={{ margin: 0, fontSize: 12, color: T.muted, fontFamily: "var(--font-poppins)" }}>
                 Agrega una bebida para comenzar
               </p>
             </div>
@@ -171,65 +157,43 @@ const BottomCart: FC<BottomCartProps> = ({
               {/* Items */}
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
                 {items.map((item) => (
-                  <div
-                    key={item.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      gap: 12,
-                      padding: "12px 14px",
-                      background: C.white,
-                      borderRadius: 14,
-                      border: `1px solid ${C.border}`,
-                      boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-                    }}
-                  >
+                  <div key={item.id} style={{
+                    display: "flex", justifyContent: "space-between",
+                    alignItems: "flex-start", gap: 12,
+                    padding: "12px 14px",
+                    background: T.white,
+                    borderRadius: 14,
+                    border: `1px solid ${T.border}`,
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                  }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{
-                        margin: "0 0 2px", fontSize: 14, fontWeight: 600,
-                        color: C.dark, fontFamily: "var(--font-poppins)",
-                      }}>
+                      <p style={{ margin: "0 0 2px", fontSize: 14, fontWeight: 600, color: T.text, fontFamily: "var(--font-poppins)" }}>
                         {item.name}
                       </p>
-                      <p style={{
-                        margin: "0 0 1px", fontSize: 11, fontWeight: 300,
-                        color: C.muted, fontFamily: "var(--font-poppins)",
-                      }}>
+                      <p style={{ margin: "0 0 1px", fontSize: 11, color: T.muted, fontFamily: "var(--font-poppins)" }}>
                         {SIZE_LABELS[item.size] ?? item.size} · {item.category}
                       </p>
                       {item.toppings.length > 0 && (
-                        <p style={{
-                          margin: "1px 0 0", fontSize: 10.5, fontWeight: 300,
-                          color: C.muted, fontFamily: "var(--font-poppins)",
-                        }}>
+                        <p style={{ margin: "1px 0 0", fontSize: 10.5, color: T.muted, fontFamily: "var(--font-poppins)" }}>
                           {item.toppings.join(" · ")}
                         </p>
                       )}
-                      <p style={{
-                        margin: "4px 0 0", fontSize: 10.5,
-                        color: C.muted, fontFamily: "var(--font-poppins)",
-                      }}>
+                      <p style={{ margin: "4px 0 0", fontSize: 10.5, color: T.mutedLight, fontFamily: "var(--font-poppins)" }}>
                         Cantidad: {item.quantity}
                       </p>
                     </div>
-
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-                      <span style={{
-                        fontSize: 14, fontWeight: 700,
-                        color: C.olive, fontFamily: "var(--font-poppins)",
-                      }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: T.olive, fontFamily: "var(--font-poppins)" }}>
                         ${(item.price * item.quantity).toFixed(2)}
                       </span>
                       <button
+                        className="remove-btn"
                         onClick={() => onRemoveItem(item.id)}
                         style={{
                           background: "none", border: "none", padding: 4,
-                          cursor: "pointer", color: "#ccc", display: "flex",
-                          alignItems: "center", transition: "color 0.15s ease",
+                          cursor: "pointer", color: T.border,
+                          display: "flex", alignItems: "center",
                         }}
-                        onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#e05555")}
-                        onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#ccc")}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -239,22 +203,20 @@ const BottomCart: FC<BottomCartProps> = ({
               </div>
 
               {/* Total + actions */}
-              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16, marginBottom: 8 }}>
+              <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 16, marginBottom: 8 }}>
                 <div style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "baseline",
-                  marginBottom: 16,
+                  display: "flex", justifyContent: "space-between",
+                  alignItems: "baseline", marginBottom: 16,
                 }}>
                   <span style={{
-                    fontSize: 12, fontWeight: 600, color: C.muted,
+                    fontSize: 12, fontWeight: 600, color: T.muted,
                     letterSpacing: "0.08em", textTransform: "uppercase",
                     fontFamily: "var(--font-poppins)",
                   }}>
                     Total
                   </span>
                   <span style={{
-                    fontSize: 28, fontWeight: 700, color: C.dark,
+                    fontSize: 28, fontWeight: 700, color: T.text,
                     letterSpacing: "-0.03em", fontFamily: "var(--font-poppins)",
                   }}>
                     ${total.toFixed(2)}
@@ -265,19 +227,11 @@ const BottomCart: FC<BottomCartProps> = ({
                   onClick={handleWhatsAppOrder}
                   className="wa-send-btn"
                   style={{
-                    width: "100%",
-                    height: 54,
-                    borderRadius: 14,
-                    border: "none",
-                    background: C.wa,
-                    color: "#FFF",
-                    fontSize: 15,
-                    fontWeight: 700,
+                    width: "100%", height: 54, borderRadius: 14, border: "none",
+                    background: T.wa, color: "#FFF",
+                    fontSize: 15, fontWeight: 700,
                     cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 9,
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
                     marginBottom: 10,
                     fontFamily: "var(--font-poppins)",
                     letterSpacing: "-0.01em",
@@ -292,16 +246,11 @@ const BottomCart: FC<BottomCartProps> = ({
                   onClick={onClearCart}
                   className="clear-btn"
                   style={{
-                    width: "100%",
-                    height: 40,
-                    borderRadius: 10,
-                    border: `1px solid ${C.border}`,
+                    width: "100%", height: 40, borderRadius: 10,
+                    border: `1px solid ${T.border}`,
                     background: "transparent",
-                    color: C.muted,
-                    fontSize: 12,
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    fontFamily: "var(--font-poppins)",
+                    color: T.muted, fontSize: 12, fontWeight: 500,
+                    cursor: "pointer", fontFamily: "var(--font-poppins)",
                   }}
                 >
                   Limpiar carrito
