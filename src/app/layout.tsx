@@ -27,6 +27,9 @@ export const metadata: Metadata = {
   icons: {
     apple: "/apple-touch-icon.png",
   },
+  verification: {
+    google: "oOauXUqTM2tI568bzi2gs1PNhWoHD3aYXKuyCCOE12M",
+  },
 };
 
 export default function RootLayout({
@@ -36,7 +39,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body className={`${poppins.variable} antialiased`}>
+<body className={`${poppins.variable} antialiased`}>
         {children}
         <Analytics />
       </body>
