@@ -277,7 +277,7 @@ function OrderCard({
 }
 
 // ── New order drawer ───────────────────────────────────────
-type DraftItem = { menuItem: MenuItem; category: string; size: string; toppings: string[]; price: number };
+type DraftItem = { menuItem: MenuItem; category: string; size: string; toppings: string[]; price: number; quantity: number };
 
 function NewOrderDrawer({
   onClose, onSave,
@@ -294,6 +294,7 @@ function NewOrderDrawer({
   const [configuring, setConfiguring] = useState<{ item: MenuItem; category: string } | null>(null);
   const [selectedSize, setSelectedSize] = useState("grande");
   const [selectedToppings, setSelectedToppings] = useState<string[]>([]);
+  const [qty, setQty] = useState(1);
   const [draft, setDraft] = useState<DraftItem[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -315,27 +316,50 @@ function NewOrderDrawer({
     setConfiguring({ item, category: cat });
     setSelectedSize("grande");
     setSelectedToppings([]);
+    setQty(1);
   }
 
   function addToDraft() {
     if (!configuring || !priceRules) return;
     const basePrice = getPrice(configuring.item, selectedSize, configuring.category, priceRules);
-    const price = basePrice + toppingPrice(selectedToppings.length);
-    setDraft((d) => [...d, {
-      menuItem: configuring.item,
-      category: configuring.category,
-      size: selectedSize,
-      toppings: selectedToppings,
-      price,
-    }]);
+    const unitPrice = basePrice + toppingPrice(selectedToppings.length);
+    setDraft((d) => {
+      const existingIdx = d.findIndex(
+        (x) =>
+          x.menuItem.id === configuring.item.id &&
+          x.category === configuring.category &&
+          x.size === selectedSize &&
+          JSON.stringify([...x.toppings].sort()) === JSON.stringify([...selectedToppings].sort())
+      );
+      if (existingIdx >= 0) {
+        const updated = [...d];
+        updated[existingIdx] = { ...updated[existingIdx], quantity: updated[existingIdx].quantity + qty };
+        return updated;
+      }
+      return [...d, {
+        menuItem: configuring.item,
+        category: configuring.category,
+        size: selectedSize,
+        toppings: selectedToppings,
+        price: unitPrice,
+        quantity: qty,
+      }];
+    });
     setConfiguring(null);
   }
 
-  function removeDraft(i: number) {
-    setDraft((d) => d.filter((_, idx) => idx !== i));
+  function changeQty(idx: number, delta: number) {
+    setDraft((d) => {
+      const newQty = d[idx].quantity + delta;
+      if (newQty <= 0) return d.filter((_, i) => i !== idx);
+      const updated = [...d];
+      updated[idx] = { ...updated[idx], quantity: newQty };
+      return updated;
+    });
   }
 
-  const draftTotal = draft.reduce((s, d) => s + d.price, 0);
+  const draftTotal = draft.reduce((s, d) => s + d.price * d.quantity, 0);
+  const draftCount = draft.reduce((s, d) => s + d.quantity, 0);
 
   async function handleSave() {
     if (draft.length === 0) return;
@@ -349,6 +373,14 @@ function NewOrderDrawer({
     border: `1px solid ${T.border}`, background: T.white,
     fontSize: 13, fontFamily: "var(--font-poppins)", color: T.text, outline: "none",
   };
+
+  const qtyBtnStyle = (active?: boolean): React.CSSProperties => ({
+    width: 30, height: 30, borderRadius: 8, border: `1px solid ${T.border}`,
+    background: active ? T.text : T.white, color: active ? T.white : T.text,
+    fontSize: 16, fontWeight: 700, cursor: "pointer",
+    fontFamily: "var(--font-poppins)", display: "flex", alignItems: "center", justifyContent: "center",
+    flexShrink: 0,
+  });
 
   return (
     <div
@@ -366,7 +398,16 @@ function NewOrderDrawer({
           background: T.white, borderBottom: `1px solid ${T.border}`,
           display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0,
         }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>Nueva orden</h2>
+          {configuring ? (
+            <button
+              onClick={() => setConfiguring(null)}
+              style={{ background: "none", border: "none", cursor: "pointer", color: T.muted, padding: "4px 0", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, fontFamily: "var(--font-poppins)" }}
+            >
+              ← Volver al catálogo
+            </button>
+          ) : (
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>Nueva orden</h2>
+          )}
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: T.muted, padding: 4 }}>
             <X size={20} />
           </button>
@@ -381,19 +422,14 @@ function NewOrderDrawer({
               background: T.white, border: `1px solid ${T.border}`,
               borderRadius: 12, padding: "16px", marginBottom: 12,
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <div>
-                  <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: T.text }}>{configuring.item.name}</p>
-                  <p style={{ margin: "2px 0 0", fontSize: 11, color: T.muted }}>{CAT_LABELS[configuring.category] ?? configuring.category}</p>
-                </div>
-                <button onClick={() => setConfiguring(null)} style={{ background: "none", border: "none", cursor: "pointer", color: T.muted }}>
-                  <X size={16} />
-                </button>
+              <div style={{ marginBottom: 14 }}>
+                <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: T.text }}>{configuring.item.name}</p>
+                <p style={{ margin: "2px 0 0", fontSize: 11, color: T.muted }}>{CAT_LABELS[configuring.category] ?? configuring.category}</p>
               </div>
 
               {/* Size */}
               <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 600, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Tamaño</p>
-              <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+              <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
                 {SIZE_IDS.map((s) => {
                   const p = priceRules ? getPrice(configuring.item, s, configuring.category, priceRules) : 0;
                   return (
@@ -418,7 +454,7 @@ function NewOrderDrawer({
                   <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 600, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                     Toppings <span style={{ fontWeight: 400, textTransform: "none" }}>(1er gratis, +$10 c/u)</span>
                   </p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                     {allToppings.map((t) => {
                       const active = selectedToppings.includes(t);
                       return (
@@ -440,23 +476,51 @@ function NewOrderDrawer({
                 </>
               )}
 
+              {/* Quantity stepper */}
+              <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 600, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Cantidad</p>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                <button onClick={() => setQty((q) => Math.max(1, q - 1))} style={qtyBtnStyle()}>−</button>
+                <span style={{ fontSize: 18, fontWeight: 700, color: T.text, minWidth: 28, textAlign: "center" }}>{qty}</span>
+                <button onClick={() => setQty((q) => q + 1)} style={qtyBtnStyle()}>+</button>
+              </div>
+
               {/* Price preview + add */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: T.text }}>
-                  ${priceRules ? getPrice(configuring.item, selectedSize, configuring.category, priceRules) + toppingPrice(selectedToppings.length) : "—"}
-                </span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 4, borderTop: `1px solid ${T.border}` }}>
+                <div>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: T.text }}>
+                    ${priceRules ? (getPrice(configuring.item, selectedSize, configuring.category, priceRules) + toppingPrice(selectedToppings.length)) * qty : "—"}
+                  </span>
+                  {qty > 1 && (
+                    <span style={{ fontSize: 11, color: T.mutedLight, marginLeft: 6 }}>
+                      × {qty} unidades
+                    </span>
+                  )}
+                </div>
                 <button onClick={addToDraft} style={{
-                  height: 36, padding: "0 20px", borderRadius: 8,
-                  border: "none", background: T.text, color: T.white,
-                  fontSize: 13, fontWeight: 600, cursor: "pointer",
-                  fontFamily: "var(--font-poppins)",
+                  height: 40, padding: "0 20px", borderRadius: 8,
+                  border: `1px solid ${T.border}`, background: T.white, color: T.text,
+                  fontSize: 13, fontWeight: 700, cursor: "pointer",
+                  fontFamily: "var(--font-poppins)", display: "flex", alignItems: "center", gap: 6,
                 }}>
-                  Agregar a la orden
+                  <Plus size={14} /> Agregar
                 </button>
               </div>
             </div>
           ) : (
             <>
+              {/* Context banner when draft has items */}
+              {draft.length > 0 && (
+                <div style={{
+                  background: T.blueBg, border: `1px solid ${T.blueBorder}`,
+                  borderRadius: 8, padding: "8px 12px", marginBottom: 10,
+                  fontSize: 12, color: T.blue, fontWeight: 500,
+                  display: "flex", alignItems: "center", gap: 6,
+                }}>
+                  <Plus size={13} />
+                  Elige otro producto para agregar a la orden
+                </div>
+              )}
+
               {/* Search */}
               <input
                 placeholder="Buscar producto..."
@@ -508,13 +572,13 @@ function NewOrderDrawer({
           )}
 
           {/* Draft items */}
-          {draft.length > 0 && (
+          {draft.length > 0 && !configuring && (
             <div style={{
               background: T.white, border: `1px solid ${T.border}`,
               borderRadius: 12, overflow: "hidden", marginBottom: 12,
             }}>
               <p style={{ margin: 0, padding: "10px 14px", fontSize: 12, fontWeight: 600, color: T.muted, borderBottom: `1px solid ${T.border}` }}>
-                En esta orden
+                En esta orden · {draftCount} {draftCount === 1 ? "producto" : "productos"}
               </p>
               {draft.map((d, i) => (
                 <div key={i} style={{
@@ -529,13 +593,25 @@ function NewOrderDrawer({
                       {d.toppings.length > 0 && ` · ${d.toppings.join(", ")}`}
                     </p>
                   </div>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>${d.price}</span>
-                  <button onClick={() => removeDraft(i)} style={{
-                    background: "none", border: "none", cursor: "pointer",
-                    color: T.mutedLight, padding: 2, display: "flex",
-                  }}>
-                    <X size={14} />
-                  </button>
+                  {/* Quantity stepper inline */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    <button onClick={() => changeQty(i, -1)} style={{
+                      width: 24, height: 24, borderRadius: 6, border: `1px solid ${T.border}`,
+                      background: T.white, color: T.text, fontSize: 14, fontWeight: 700,
+                      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                      fontFamily: "var(--font-poppins)",
+                    }}>−</button>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: T.text, minWidth: 18, textAlign: "center" }}>{d.quantity}</span>
+                    <button onClick={() => changeQty(i, 1)} style={{
+                      width: 24, height: 24, borderRadius: 6, border: `1px solid ${T.border}`,
+                      background: T.white, color: T.text, fontSize: 14, fontWeight: 700,
+                      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                      fontFamily: "var(--font-poppins)",
+                    }}>+</button>
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: T.text, flexShrink: 0, minWidth: 36, textAlign: "right" }}>
+                    ${d.price * d.quantity}
+                  </span>
                 </div>
               ))}
             </div>
@@ -543,28 +619,29 @@ function NewOrderDrawer({
         </div>
 
         {/* Footer */}
-        {draft.length > 0 && (
+        {draft.length > 0 && !configuring && (
           <div style={{
             padding: "14px 16px 20px",
-            background: T.white, borderTop: `1px solid ${T.border}`,
+            background: T.white, borderTop: `2px solid ${T.greenBorder}`,
             flexShrink: 0,
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <span style={{ fontSize: 13, color: T.muted, fontFamily: "var(--font-poppins)" }}>
-                {draft.length} producto{draft.length !== 1 ? "s" : ""}
+                {draftCount} {draftCount === 1 ? "producto" : "productos"}
               </span>
               <span style={{ fontSize: 20, fontWeight: 700, color: T.text, fontFamily: "var(--font-poppins)" }}>
                 ${draftTotal}
               </span>
             </div>
             <button onClick={handleSave} disabled={saving} style={{
-              width: "100%", height: 44, borderRadius: 10, border: "none",
-              background: T.text, color: T.white,
-              fontSize: 14, fontWeight: 700, cursor: "pointer",
+              width: "100%", height: 48, borderRadius: 10, border: "none",
+              background: T.green, color: T.white,
+              fontSize: 15, fontWeight: 700, cursor: "pointer",
               fontFamily: "var(--font-poppins)", opacity: saving ? 0.6 : 1,
               transition: "opacity 0.15s",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             }}>
-              {saving ? "Creando..." : "Crear orden"}
+              {saving ? "Creando..." : <><Check size={16} /> Crear orden · ${draftTotal}</>}
             </button>
           </div>
         )}
@@ -633,9 +710,9 @@ export default function ComandaPage() {
       category: d.category,
       toppings: d.toppings,
       price: d.price,
-      quantity: 1,
+      quantity: d.quantity,
     }));
-    const total = draft.reduce((s, d) => s + d.price, 0);
+    const total = draft.reduce((s, d) => s + d.price * d.quantity, 0);
     await saveFullOrder({ items, total, source: "comanda", orderNumber });
     setShowNewOrder(false);
   }
