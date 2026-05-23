@@ -142,23 +142,40 @@ interface Flavor {
 }
 ```
 
-## Brand tokens (colores)
+## Design tokens (colores)
 
-Definidos en `src/components/menu/index.tsx` como objeto `C`:
+El menu publico (`index.tsx`, `BottomProduct.tsx`, `BottomCart.tsx`) y la tarjeta de fidelidad (`mi-tarjeta/page.tsx`) comparten el mismo sistema de tokens `T`:
 
 ```ts
-const C = {
-  dark:  "#CD576A",  // header, botones primarios
-  rose:  "#CD576A",  // CTAs, estados activos
-  olive: "#79874C",  // acentos secundarios, precios
-  pink:  "#F298AA",  // highlights suaves
-  cream: "#F8F5F1",  // fondo de pagina
-  text:  "#2A2019",  // texto principal
-  muted: "#8A7A6E",  // texto secundario
+const T = {
+  bg:          "#F8FAFC",   // fondo de pagina
+  white:       "#FFFFFF",   // superficie de cards y drawers
+  border:      "#E2E8F0",   // bordes slate (cards, separadores)
+  text:        "#0F172A",   // texto principal
+  secondary:   "#334155",   // texto secundario
+  muted:       "#64748B",   // texto auxiliar
+  mutedLight:  "#94A3B8",   // texto muy suave
+  slate:       "#F1F5F9",   // fondos de hover / skeleton
+  rose:        "#CD576A",   // acento principal (CTAs, activos, header)
+  roseBg:      "#FFF1F2",   // fondo suave rose (chips, placeholders)
+  roseBorder:  "#FECDD3",   // borde rose
+  roseDeep:    "#B8465A",   // rose hover/pressed
+  olive:       "#79874C",   // precios, acentos secundarios
+  oliveBg:     "rgba(121,135,76,0.08)",
+  oliveBorder: "rgba(121,135,76,0.2)",
 };
 ```
 
-El panel admin usa un sistema de tokens distinto (objeto `T`) con colores neutros slate/blue.
+El panel admin usa los mismos tokens `T` con la adicion de colores blue/slate para la UI de gestion.
+
+### Estructura visual del menu publico
+
+- **Header**: blanco, borde inferior slate, logo `src/assets/images/logo-pink.png`
+- **Category tabs**: fondo blanco, borde inferior slate; tab activa = pill rose, inactiva = pill con borde slate
+- **Product cards**: `background: T.white`, `border: 1px solid T.border`, sombra sutil
+- **Barra del carrito**: fondo `T.bg`, boton verde WhatsApp (`#22C55E`)
+- **BottomProduct drawer**: fondo blanco, borde superior rose; size buttons activos en `roseBg` + borde rose; topping pills activos en rose solido
+- **BottomCart drawer**: fondo blanco, borde superior rose; boton WhatsApp verde hero
 
 ## Logica de precios (`getPrice` en `src/components/menu/index.tsx`)
 
@@ -315,7 +332,8 @@ interface Expense {
 Al confirmar en `BottomCart.tsx`:
 1. Guarda la orden en Firestore coleccion `orders` con `source: "whatsapp"`, `status: "pending"`
 2. Abre WhatsApp al numero `529969634631` con el pedido formateado en texto
-3. Incluye telefono de fidelidad en el mensaje si el cliente lo ingreso
+
+El campo de telefono de fidelidad fue eliminado del flujo de pedido publico. La fidelidad se gestiona exclusivamente desde el panel admin (`/admin/loyalty`).
 
 ## Sistema de fidelidad
 
@@ -458,7 +476,7 @@ Boton en el menu publico que abre un bottom sheet con una bebida aleatoria pre-a
 
 - Los sabores comentados en `menu.ts` son los que estan **temporalmente deshabilitados** (Durazno, Mango, Taro, etc.) — no eliminar, solo comentar/descomentar para activarlos. La fuente de verdad en produccion es Firestore.
 - La categoria `milkTea` existe en los datos pero esta comentada en el array `categories` — los sabores con esa categoria siguen en el array `flavors`.
-- El carrito muestra una barra fija en el footer solo cuando `cartItemCount > 0`.
+- El carrito muestra una barra fija verde WhatsApp en el footer solo cuando `cartItemCount > 0`. Abre `BottomCart` para revisar antes de enviar.
 - Las imagenes de productos se sirven desde Supabase Storage. Las imagenes estaticas en `src/assets/images/` solo se usan como fallback cuando un item de Firestore no tiene `imageUrls`.
 - `next.config.ts` incluye `*.supabase.co` en `images.remotePatterns` para permitir `next/image` con URLs de Supabase.
 - El schema de `Order` mantiene compatibilidad con el formato legacy (single-item) via campos opcionales `flavor`, `size`, `price`, `quantity`. Usar siempre `getOrderTotal()` y `getOrderLabel()` para leer ordenes.
