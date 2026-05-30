@@ -11,6 +11,7 @@ import {
   OrderItem,
   OrderStatus,
 } from "@/lib/orders";
+import { deductVasos, SizeId } from "@/lib/insumos";
 import {
   getMenuItems,
   getPriceRules,
@@ -699,6 +700,24 @@ export default function ComandaPage() {
   async function handleAction(id: string, status: OrderStatus) {
     setUpdatingId(id);
     await updateOrderStatus(id, status);
+
+    if (status === "delivered") {
+      const order = orders.find((o) => o.id === id);
+      if (order) {
+        const counts: Partial<Record<SizeId, number>> = {};
+        if (order.items) {
+          for (const item of order.items) {
+            const s = item.size as SizeId;
+            counts[s] = (counts[s] ?? 0) + item.quantity;
+          }
+        } else if (order.size) {
+          const s = order.size as SizeId;
+          counts[s] = (counts[s] ?? 0) + (order.quantity ?? 1);
+        }
+        await deductVasos(counts);
+      }
+    }
+
     setUpdatingId(null);
   }
 

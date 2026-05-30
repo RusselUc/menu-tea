@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { BarChart2, Heart, UtensilsCrossed, Receipt, ClipboardList } from "lucide-react";
+import { BarChart2, Heart, UtensilsCrossed, Receipt, ClipboardList, Package } from "lucide-react";
 import logoPink from "@/assets/images/logo-pink.png";
 import { checkAdminSession } from "../session";
 
@@ -10,6 +10,7 @@ const NAV = [
   { href: "/admin/comanda", label: "Comanda", icon: ClipboardList },
   { href: "/admin/dashboard", label: "Métricas", icon: BarChart2 },
   { href: "/admin/gastos", label: "Gastos", icon: Receipt },
+  { href: "/admin/insumos", label: "Insumos", icon: Package },
   { href: "/admin/loyalty", label: "Fidelidad", icon: Heart },
   { href: "/admin/menu", label: "Menú", icon: UtensilsCrossed },
 ];
