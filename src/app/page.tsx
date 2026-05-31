@@ -1,6 +1,5 @@
-import Menu from "@/components/menu";
+import Hero from "@/components/hero";
 
-const PageMenu = () => {
-  return <Menu />;
-};
-export default PageMenu;
+export default function Home() {
+  return <Hero />;
+}

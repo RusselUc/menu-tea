@@ -9,6 +9,7 @@ import { getMenuItems, getPriceRules, getToppings, getBanner, PriceRules, DEFAUL
 import BottomProduct from "./BottomProduct";
 import BottomCart from "./BottomCart";
 import { Drawer, DrawerContent } from "../ui/drawer";
+import { AlertTriangle } from "lucide-react";
 
 /* ─── Design tokens — aligned with loyalty card ────────── */
 const T = {
@@ -155,6 +156,11 @@ const Menu = () => {
   const [randomDraw, setRandomDraw] = useState<RandomDraw | null>(null);
   const [menuLoading, setMenuLoading] = useState(true);
   const [banner, setBanner] = useState<BannerSettings | null>(null);
+  const [isFbia, setIsFbia] = useState(false);
+
+  useEffect(() => {
+    setIsFbia(/FBAN|FBAV|FB_IAB/i.test(navigator.userAgent));
+  }, []);
 
   useEffect(() => {
     Promise.all([getMenuItems(), getPriceRules(), getToppings(), getBanner()])
@@ -195,6 +201,37 @@ const Menu = () => {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: T.bg, fontFamily: "var(--font-poppins)" }}>
+
+      {/* ── Facebook in-app browser warning ────────── */}
+      {isFbia && (
+        <div style={{
+          backgroundColor: T.roseBg,
+          borderBottom: `1px solid ${T.roseBorder}`,
+          padding: "11px 18px",
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 10,
+        }}>
+          <AlertTriangle size={18} color={T.rose} style={{ flexShrink: 0, marginTop: 1 }} />
+          <div>
+            <p style={{
+              margin: 0,
+              fontSize: 13, fontWeight: 700,
+              color: T.rose,
+              fontFamily: "var(--font-poppins)",
+            }}>
+              Abre en tu navegador para hacer tu pedido
+            </p>
+            <p style={{
+              margin: "2px 0 0",
+              fontSize: 12, color: T.secondary,
+              fontFamily: "var(--font-poppins)",
+            }}>
+              Toca <strong>···</strong> y elige &quot;Abrir en navegador externo&quot;
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Header ─────────────────────────────────── */}
       <header style={{
