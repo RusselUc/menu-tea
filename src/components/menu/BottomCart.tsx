@@ -64,28 +64,31 @@ const BottomCart: FC<BottomCartProps> = ({
     return encodeURIComponent(msg);
   };
 
-  const handleWhatsAppOrder = async () => {
-    const orderNumber = await getNextOrderNumber().catch(() => undefined);
-    saveFullOrder({
-      items: items.map((item) => ({
-        flavor:   item.name,
-        size:     item.size,
-        category: item.category,
-        toppings: item.toppings,
-        price:    item.price,
-        quantity: item.quantity,
-      })),
-      total,
-      source: "whatsapp",
-      ...(orderNumber ? { orderNumber } : {}),
-    }).catch(console.error);
-
+  const handleWhatsAppOrder = () => {
     window.open(
       `https://wa.me/529969634631?text=${generateWhatsAppMessage()}`,
       "_blank"
     );
     onClearCart();
     onClose();
+
+    getNextOrderNumber()
+      .catch(() => undefined)
+      .then((orderNumber) =>
+        saveFullOrder({
+          items: items.map((item) => ({
+            flavor:   item.name,
+            size:     item.size,
+            category: item.category,
+            toppings: item.toppings,
+            price:    item.price,
+            quantity: item.quantity,
+          })),
+          total,
+          source: "whatsapp",
+          ...(orderNumber ? { orderNumber } : {}),
+        }).catch(console.error)
+      );
   };
 
   return (
