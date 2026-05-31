@@ -131,15 +131,15 @@ export default function Hero() {
             <div className="hero-glow absolute inset-0 rounded-full bg-[#BB5862] opacity-[0.08] blur-[60px] scale-90 pointer-events-none" />
 
             {/* Badge — Favorito */}
-            <div className="hero-badge-a hero-badge-hover absolute -left-2 top-[22%] z-10 flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-md cursor-default">
-              <div className="w-7 h-7 rounded-full bg-[#FFF1F2] flex items-center justify-center shrink-0">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="#BB5862">
+            <div className="hero-badge-a hero-badge-hover absolute -left-2 top-[22%] z-10 flex items-center gap-1.5 sm:gap-2 bg-white border border-slate-200 rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 shadow-md cursor-default">
+              <div className="w-5 h-5 sm:w-7 sm:h-7 rounded-full bg-[#FFF1F2] flex items-center justify-center shrink-0">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="#BB5862">
                   <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
                 </svg>
               </div>
               <div>
-                <div className="text-[11px] font-bold text-slate-900 leading-tight">Favorito</div>
-                <div className="text-[10px] text-slate-500 leading-tight">Lotus</div>
+                <div className="text-[9px] sm:text-[11px] font-bold text-slate-900 leading-tight">Favorito</div>
+                <div className="text-[8px] sm:text-[10px] text-slate-500 leading-tight">Lotus</div>
               </div>
             </div>
 
@@ -155,9 +155,9 @@ export default function Hero() {
             </div>
 
             {/* Badge — Perlas */}
-            <div className="hero-badge-b hero-badge-hover absolute -right-2 bottom-[22%] z-10 flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-md cursor-default">
-              <div className="w-7 h-7 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="#6366F1">
+            <div className="hero-badge-b hero-badge-hover absolute -right-2 bottom-[22%] z-10 flex items-center gap-1.5 sm:gap-2 bg-white border border-slate-200 rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 shadow-md cursor-default">
+              <div className="w-5 h-5 sm:w-7 sm:h-7 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="#6366F1">
                   <circle cx="12" cy="12" r="4" />
                   <circle cx="4" cy="12" r="3" />
                   <circle cx="20" cy="12" r="3" />
@@ -166,8 +166,8 @@ export default function Hero() {
                 </svg>
               </div>
               <div>
-                <div className="text-[11px] font-bold text-slate-900 leading-tight">Perlas</div>
-                <div className="text-[10px] text-slate-500 leading-tight">Perlas explosivas</div>
+                <div className="text-[9px] sm:text-[11px] font-bold text-slate-900 leading-tight">Perlas</div>
+                <div className="text-[8px] sm:text-[10px] text-slate-500 leading-tight">Perlas explosivas</div>
               </div>
             </div>
           </div>
