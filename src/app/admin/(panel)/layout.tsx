@@ -2,18 +2,23 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { BarChart2, Heart, UtensilsCrossed, Receipt, ClipboardList, Package } from "lucide-react";
+import { BarChart2, Heart, UtensilsCrossed, Receipt, ClipboardList, Package, MoreHorizontal } from "lucide-react";
 import logoPink from "@/assets/images/logo-pink.png";
 import { checkAdminSession } from "../session";
 
-const NAV = [
+const NAV_PRIMARY = [
   { href: "/admin/comanda", label: "Comanda", icon: ClipboardList },
   { href: "/admin/dashboard", label: "Métricas", icon: BarChart2 },
+  { href: "/admin/loyalty", label: "Fidelidad", icon: Heart },
+];
+
+const NAV_MORE = [
   { href: "/admin/gastos", label: "Gastos", icon: Receipt },
   { href: "/admin/insumos", label: "Insumos", icon: Package },
-  { href: "/admin/loyalty", label: "Fidelidad", icon: Heart },
   { href: "/admin/menu", label: "Menú", icon: UtensilsCrossed },
 ];
+
+const NAV = [...NAV_PRIMARY, ...NAV_MORE];
 
 export default function AdminPanelLayout({
   children,
@@ -23,6 +28,9 @@ export default function AdminPanelLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const isMoreActive = NAV_MORE.some((n) => n.href === pathname);
 
   useEffect(() => {
     if (!checkAdminSession()) {
@@ -76,7 +84,62 @@ export default function AdminPanelLayout({
           justify-content: center;
           gap: 3px;
           text-decoration: none;
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 0;
           transition: color 0.15s;
+        }
+
+        /* ── More sheet overlay ── */
+        .more-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.4);
+          z-index: 60;
+          animation: fadeIn 0.18s ease;
+        }
+        .more-sheet {
+          position: fixed;
+          bottom: 0; left: 0; right: 0;
+          background: #ffffff;
+          border-radius: 20px 20px 0 0;
+          border-top: 1px solid #E2E8F0;
+          z-index: 61;
+          padding: 12px 0 calc(env(safe-area-inset-bottom) + 16px);
+          animation: slideUp 0.22s cubic-bezier(0.32,0.72,0,1);
+        }
+        .more-sheet-handle {
+          width: 36px; height: 4px;
+          background: #E2E8F0;
+          border-radius: 2px;
+          margin: 0 auto 16px;
+        }
+        .more-sheet-item {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 14px 24px;
+          text-decoration: none;
+          font-size: 15px;
+          font-weight: 500;
+          font-family: var(--font-poppins);
+          color: #334155;
+          transition: background 0.12s;
+        }
+        .more-sheet-item:active {
+          background: #F1F5F9;
+        }
+        .more-sheet-item.active {
+          color: #2563EB;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from { transform: translateY(100%); }
+          to   { transform: translateY(0); }
         }
 
         /* ── Sidebar nav items ── */
@@ -164,7 +227,7 @@ export default function AdminPanelLayout({
 
         {/* Bottom nav */}
         <nav className="admin-bottom-nav">
-          {NAV.map(({ href, label, icon: Icon }) => {
+          {NAV_PRIMARY.map(({ href, label, icon: Icon }) => {
             const active = pathname === href;
             return (
               <Link
@@ -174,17 +237,48 @@ export default function AdminPanelLayout({
                 style={{ color: active ? "#2563EB" : "#94A3B8" }}
               >
                 <Icon size={20} strokeWidth={active ? 2.2 : 1.6} />
-                <span style={{
-                  fontSize: 10,
-                  fontWeight: active ? 600 : 400,
-                  fontFamily: "var(--font-poppins)",
-                }}>
+                <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, fontFamily: "var(--font-poppins)" }}>
                   {label}
                 </span>
               </Link>
             );
           })}
+
+          <button
+            className="bottom-nav-item"
+            style={{ color: isMoreActive ? "#2563EB" : "#94A3B8" }}
+            onClick={() => setMoreOpen(true)}
+          >
+            <MoreHorizontal size={20} strokeWidth={isMoreActive ? 2.2 : 1.6} />
+            <span style={{ fontSize: 10, fontWeight: isMoreActive ? 600 : 400, fontFamily: "var(--font-poppins)" }}>
+              Más
+            </span>
+          </button>
         </nav>
+
+        {/* More sheet */}
+        {moreOpen && (
+          <>
+            <div className="more-overlay" onClick={() => setMoreOpen(false)} />
+            <div className="more-sheet">
+              <div className="more-sheet-handle" />
+              {NAV_MORE.map(({ href, label, icon: Icon }) => {
+                const active = pathname === href;
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`more-sheet-item${active ? " active" : ""}`}
+                    onClick={() => setMoreOpen(false)}
+                  >
+                    <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
     </>
   );
