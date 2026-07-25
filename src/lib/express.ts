@@ -118,7 +118,30 @@ export async function updateDynamic(
   id: string,
   data: Partial<Pick<ExpressDynamic, "title" | "description" | "questions" | "maxWinners">>
 ): Promise<void> {
-  await updateDoc(doc(db, DYNAMICS_COL, id), data);
+  const ref = doc(db, DYNAMICS_COL, id);
+
+  // Si se esta tocando maxWinners, hay que revisar si el winnersCount actual
+  // ya alcanza (o supera) el nuevo cupo — por ejemplo, el admin olvido poner
+  // un limite, la dinamica ya lleva 3 ganadores, y recien ahora le pone
+  // maxWinners=3. En ese caso la dinamica se concluye en este mismo guardado,
+  // en vez de esperar a que entre un ganador mas para que se cierre sola.
+  if (!("maxWinners" in data)) {
+    await updateDoc(ref, data);
+    return;
+  }
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) return;
+    const current = snap.data() as ExpressDynamic;
+    const patch: Partial<ExpressDynamic> = { ...data };
+    const winnersCount = current.winnersCount ?? 0;
+    if (current.active && data.maxWinners && winnersCount >= data.maxWinners) {
+      patch.active = false;
+      patch.concludedAt = Date.now();
+    }
+    tx.update(ref, patch);
+  });
 }
 
 // Reinicia el contador de ganadores y limpia el estado de conclusion automatica.

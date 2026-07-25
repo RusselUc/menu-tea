@@ -8,6 +8,7 @@ import {
   createDynamic,
   deactivateDynamic,
   deleteDynamic,
+  getDynamic,
   getDynamics,
   getParticipants,
   resetWinners,
@@ -78,9 +79,9 @@ export default function DinamicaExpressPage() {
 
   useEffect(() => { loadList(); }, []);
 
-  function showToast(msg: string) {
+  function showToast(msg: string, duration = 2500) {
     setToast(msg);
-    setTimeout(() => setToast(null), 2500);
+    setTimeout(() => setToast(null), duration);
   }
 
   async function loadList() {
@@ -206,6 +207,7 @@ export default function DinamicaExpressPage() {
       return { id: q.id, text: q.text.trim(), type: "multiple", options, correctIndex, ...(imageUrl ? { imageUrl } : {}) };
     });
     const parsedMax = maxWinners.trim().length > 0 ? Math.max(1, parseInt(maxWinners, 10)) : undefined;
+    const wasActive = current.active;
     await updateDynamic(current.id, {
       title: title.trim(),
       description: description.trim(),
@@ -213,9 +215,22 @@ export default function DinamicaExpressPage() {
       maxWinners: parsedMax ?? null,
     });
     setQuestionImageFiles({});
+    // Se relee de Firestore porque updateDynamic() puede concluir la dinámica
+    // sola si el nuevo maxWinners ya fue alcanzado por el winnersCount actual
+    // (ej. se te olvidó ponerle límite y ya lleva 3 ganadores) — así el admin
+    // ve de inmediato que se cerró, sin tener que refrescar la página.
+    const refreshed = await getDynamic(current.id);
     setSaving(false);
-    showToast("Cambios guardados");
-    setCurrent({ ...current, title: title.trim(), description: description.trim(), questions: cleaned, maxWinners: parsedMax });
+    if (refreshed) {
+      setCurrent(refreshed);
+      if (wasActive && !refreshed.active) {
+        showToast("Cambios guardados — la dinámica se cerró sola: ya se había alcanzado el nuevo cupo de ganadores", 4500);
+      } else {
+        showToast("Cambios guardados");
+      }
+    } else {
+      showToast("Cambios guardados");
+    }
   }
 
   async function handleToggleActive() {
@@ -254,7 +269,8 @@ export default function DinamicaExpressPage() {
           position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)",
           background: T.white, color: T.text, border: `1px solid ${T.border}`,
           padding: "10px 20px", borderRadius: 10, fontSize: 13, fontWeight: 600,
-          zIndex: 100, boxShadow: "0 4px 24px rgba(0,0,0,0.1)", whiteSpace: "nowrap",
+          zIndex: 100, boxShadow: "0 4px 24px rgba(0,0,0,0.1)",
+          maxWidth: "calc(100vw - 32px)", width: "max-content", textAlign: "center",
         }}>
           {toast}
         </div>
