@@ -50,6 +50,12 @@ function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
+// Misma normalizacion que registerParticipant() en src/lib/express.ts, solo
+// para mostrar aqui si una respuesta abierta calificada quedo correcta.
+function normalizeAnswerText(s: string) {
+  return s.trim().toUpperCase();
+}
+
 export default function DinamicaExpressPage() {
   const [view, setView] = useState<"list" | "edit">("list");
   const [dynamics, setDynamics] = useState<ExpressDynamic[]>([]);
@@ -68,6 +74,7 @@ export default function DinamicaExpressPage() {
   const [resetting, setResetting] = useState(false);
   const [participants, setParticipants] = useState<ExpressParticipant[]>([]);
   const [participantsLoading, setParticipantsLoading] = useState(false);
+  const [expandedParticipantId, setExpandedParticipantId] = useState<string | null>(null);
 
   useEffect(() => { loadList(); }, []);
 
@@ -657,32 +664,81 @@ export default function DinamicaExpressPage() {
                 <p style={{ margin: 0, fontSize: 12.5, color: T.mutedLight }}>Aún no hay participantes</p>
               </div>
             ) : (
-              participants.map((p, idx) => (
-                <div key={p.id} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
-                  padding: "12px 20px", borderBottom: idx < participants.length - 1 ? `1px solid ${T.border}` : "none",
-                }}>
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: T.text }}>{p.name}</p>
-                    <p style={{ margin: "1px 0 0", fontSize: 11.5, color: T.mutedLight }}>
-                      {p.phone} · {formatDate(p.timestamp)}
-                    </p>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                    {p.totalGraded > 0 && (
-                      <span style={{ fontSize: 11.5, color: T.muted }}>{p.correctCount}/{p.totalGraded}</span>
+              participants.map((p, idx) => {
+                const expanded = expandedParticipantId === p.id;
+                return (
+                  <div key={p.id} style={{ borderBottom: idx < participants.length - 1 ? `1px solid ${T.border}` : "none" }}>
+                    <button
+                      onClick={() => setExpandedParticipantId(expanded ? null : p.id)}
+                      style={{
+                        width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+                        padding: "12px 20px", background: "transparent", border: "none", cursor: "pointer",
+                        textAlign: "left", fontFamily: "var(--font-poppins)",
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: T.text }}>{p.name}</p>
+                        <p style={{ margin: "1px 0 0", fontSize: 11.5, color: T.mutedLight }}>
+                          {p.phone} · {formatDate(p.timestamp)}
+                        </p>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                        {p.totalGraded > 0 && (
+                          <span style={{ fontSize: 11.5, color: T.muted }}>{p.correctCount}/{p.totalGraded}</span>
+                        )}
+                        {p.won && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, background: T.oliveBg, color: T.olive,
+                            border: `1px solid ${T.oliveBorder}`, borderRadius: 4, padding: "1px 6px",
+                          }}>
+                            GANÓ
+                          </span>
+                        )}
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.mutedLight} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+                          style={{ flexShrink: 0, transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </div>
+                    </button>
+
+                    {expanded && (
+                      <div style={{ padding: "0 20px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+                        {current.questions.map((q, qIdx) => {
+                          const a = p.answers.find((ans) => ans.questionId === q.id);
+                          const rawValue = a?.value ?? "";
+                          const displayValue = q.type === "multiple"
+                            ? (q.options ?? [])[Number(rawValue)] ?? "(sin responder)"
+                            : rawValue || "(sin responder)";
+                          const isGraded = q.type === "multiple" || !!q.correctAnswer?.trim();
+                          const isCorrect = q.type === "multiple"
+                            ? Number(rawValue) === q.correctIndex
+                            : isGraded && normalizeAnswerText(rawValue) === normalizeAnswerText(q.correctAnswer ?? "");
+                          return (
+                            <div key={q.id} style={{ background: T.bg, borderRadius: 8, padding: "10px 12px" }}>
+                              <p style={{ margin: "0 0 4px", fontSize: 11.5, fontWeight: 600, color: T.mutedLight }}>
+                                {qIdx + 1}. {q.text}
+                              </p>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <p style={{ margin: 0, fontSize: 13, color: T.text, flex: 1 }}>{displayValue}</p>
+                                {isGraded && (
+                                  <span style={{
+                                    fontSize: 10, fontWeight: 700, borderRadius: 4, padding: "1px 6px", flexShrink: 0,
+                                    background: isCorrect ? T.oliveBg : T.roseBg,
+                                    color: isCorrect ? T.olive : T.rose,
+                                    border: `1px solid ${isCorrect ? T.oliveBorder : T.roseBorder}`,
+                                  }}>
+                                    {isCorrect ? "CORRECTA" : "INCORRECTA"}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
-                    {p.won && (
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, background: T.oliveBg, color: T.olive,
-                        border: `1px solid ${T.oliveBorder}`, borderRadius: 4, padding: "1px 6px",
-                      }}>
-                        GANÓ
-                      </span>
-                    )}
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
