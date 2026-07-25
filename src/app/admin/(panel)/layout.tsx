@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { BarChart2, Heart, UtensilsCrossed, Receipt, ClipboardList, Package, MoreHorizontal } from "lucide-react";
+import { BarChart2, Heart, UtensilsCrossed, Receipt, ClipboardList, Package, MoreHorizontal, HelpCircle } from "lucide-react";
 import logoPink from "@/assets/images/logo-pink.png";
 import { checkAdminSession } from "../session";
 
@@ -16,6 +16,7 @@ const NAV_MORE = [
   { href: "/admin/gastos", label: "Gastos", icon: Receipt },
   { href: "/admin/insumos", label: "Insumos", icon: Package },
   { href: "/admin/menu", label: "Menú", icon: UtensilsCrossed },
+  { href: "/admin/dinamica", label: "Dinámica Express", icon: HelpCircle },
 ];
 
 const NAV = [...NAV_PRIMARY, ...NAV_MORE];

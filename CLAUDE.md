@@ -12,7 +12,7 @@ Menu interactivo para **Té Sueño**, una tienda de bubble tea. Los clientes pue
 
 - **Next.js 15** + **React 19** + **TypeScript 5**
 - **Tailwind CSS 4** (con PostCSS)
-- **Firebase 12** (Firestore) — menu, precios, toppings, sesiones, ordenes, fidelidad, gastos
+- **Firebase 12** (Firestore) — menu, precios, toppings, sesiones, ordenes, fidelidad, gastos, dinamica express
 - **Supabase Storage** — imagenes de productos (bucket `menu`, ruta `{itemId}/{category}.{ext}`)
 - **Leaflet / react-leaflet** — mapa en la pantalla de entrega
 - **Radix UI** (checkbox, dialog, label, slot) + **Vaul** (drawer/modal con animaciones)
@@ -45,10 +45,12 @@ src/
 │   │       ├── dashboard/page.tsx        # Metricas y pedidos con filtro por periodo/rango
 │   │       ├── gastos/page.tsx           # Gestion de gastos del negocio
 │   │       ├── menu/page.tsx             # Gestion de productos, precios y toppings
-│   │       └── loyalty/page.tsx          # Gestion de tarjetas de fidelidad
+│   │       ├── loyalty/page.tsx          # Gestion de tarjetas de fidelidad
+│   │       └── dinamica/page.tsx         # Gestion de la Dinamica Express (preguntas y participantes)
 │   ├── api/
 │   │   └── upload-menu-image/route.ts    # API route: sube imagenes a Supabase con service role
 │   ├── mi-tarjeta/page.tsx               # Vista publica de tarjeta de fidelidad por telefono
+│   ├── dinamica/page.tsx                 # Vista publica de la Dinamica Express (registro + preguntas)
 │   └── layout.tsx
 ├── components/
 │   ├── menu/
@@ -67,6 +69,7 @@ src/
     ├── loyalty.ts                        # Operaciones Firestore para tarjetas de fidelidad
     ├── expenses.ts                       # CRUD Firestore: expenses — gastos del negocio
     ├── orders.ts                         # CRUD Firestore: orders — getOrders, saveFullOrder, subscribeToCommandaOrders
+    ├── express.ts                        # CRUD Firestore: express_dynamics, express_participants — Dinamica Express
     └── utils.ts                          # Utilidades (cn, etc.)
 ```
 
@@ -218,6 +221,8 @@ Colecciones en Firestore:
 | `loyalty_cards` | Tarjetas de fidelidad indexadas por telefono                       |
 | `expenses`      | Gastos del negocio (efectivo y tarjeta, con MSI)                   |
 | `settings/banner` | Banner informativo del menú público (`enabled`, `message`)       |
+| `express_dynamics` | Dinamica Express: tandas de preguntas de cultura general (solo una `active` a la vez) |
+| `express_participants` | Registros de participantes por dinamica (nombre, telefono, respuestas) |
 
 La config se lee desde variables de entorno `NEXT_PUBLIC_FIREBASE_*`. Ver `src/lib/firebase.ts`.
 
@@ -327,6 +332,55 @@ interface Expense {
 }
 ```
 
+### Schema `express_dynamics/{id}`
+
+```ts
+type QuestionType = "multiple" | "open";
+
+interface ExpressQuestion {
+  id: string;
+  text: string;
+  type: QuestionType;
+  options?: string[];       // solo type === "multiple"
+  correctIndex?: number;    // solo type === "multiple"
+  correctAnswer?: string;   // opcional, solo type === "open" — si se define, la pregunta califica sola
+  imageUrl?: string;        // opcional — Supabase Storage, bucket "menu", ruta express/{dynamicId}/{questionId}.{ext}
+}
+
+interface ExpressDynamic {
+  id: string;
+  title: string;
+  description?: string;
+  questions: ExpressQuestion[];
+  active: boolean;         // solo una dinamica puede estar activa a la vez
+  maxWinners?: number | null; // opcional — cupo de ganadores; al alcanzarse se desactiva sola
+  winnersCount: number;    // contador denormalizado, se actualiza atomicamente en la misma transaccion que registra al ganador
+  concludedAt?: number | null; // timestamp de cuando se desactivo sola por alcanzar maxWinners
+  createdAt: number;
+}
+```
+
+### Schema `express_participants/{dynamicId}_{phone}`
+
+```ts
+interface ExpressAnswer {
+  questionId: string;
+  value: string; // multiple: indice de la opcion ("0","1"...) | open: texto libre
+}
+
+interface ExpressParticipant {
+  id: string;           // `${dynamicId}_${phone}` — id deterministico
+  dynamicId: string;
+  name: string;
+  phone: string;        // solo digitos
+  answers: ExpressAnswer[];
+  correctCount: number;
+  totalGraded: number;  // preguntas que calificaron: todas las "multiple" + las "open" con correctAnswer definida
+  won: boolean;         // true si acerto todas las preguntas que calificaban (y hay al menos una)
+  timestamp: number;
+}
+```
+
 ## Flujo de pedido (WhatsApp)
 
 Al confirmar en `BottomCart.tsx`:
@@ -374,7 +428,7 @@ El layout (`src/app/admin/(panel)/layout.tsx`) incluye:
 - **Sidebar** en desktop (220px, fijo a la izquierda)
 - **Bottom nav** en mobile (fijo en el footer)
 
-Navegacion: **Comanda → Metricas → Gastos → Fidelidad → Menu**
+Navegacion: **Comanda → Metricas → Fidelidad → Gastos → Insumos → Menu → Publicaciones → Dinamica Express**
 
 ### `/admin/(panel)/comanda` — Comandas en tiempo real
 
@@ -445,6 +499,21 @@ Vista de cocina/caja para gestionar ordenes del dia en tiempo real.
 - Canjear bebida gratis
 - Generar link de WhatsApp para enviarle la tarjeta al cliente
 
+### `/admin/(panel)/dinamica` — Dinamica Express
+
+- Vista de lista: todas las dinamicas creadas, con badge "ACTIVA" en la que esta publicada
+- Boton "+ Nueva" crea una dinamica vacia (`active: false`) y abre la vista de edicion
+- Vista de edicion:
+  - Activar/Desactivar (`setActiveDynamic` desactiva cualquier otra dinamica activa automaticamente)
+  - Editar titulo y descripcion
+  - CRUD de preguntas: texto, tipo (opcion multiple / respuesta abierta), opciones y marcado de la correcta (solo multiple), y "Respuesta correcta" opcional para las abiertas (si se deja vacia, esa pregunta no califica)
+  - Imagen opcional por pregunta: se sube a Supabase Storage (mismo bucket `menu` que las imagenes de productos, reutilizando `uploadMenuImageSupabase` de `src/lib/supabase.ts`) bajo la ruta `express/{dynamicId}/{questionId}.{ext}`. Igual que las demas ediciones de pregunta, el archivo se sube y se persiste hasta que se pulsa "Guardar cambios" (estado local `questionImageFiles`/`questionImagePreviews` en el admin)
+  - Campo "Maximo de ganadores" (`maxWinners`, opcional) + contador de ganadores actual + boton "Reiniciar contador de ganadores"
+  - Lista de participantes registrados (nombre, telefono, aciertos, badge "GANO")
+  - Eliminar dinamica completa
+  - Badge "CONCLUIDA" en la lista cuando `concludedAt` esta seteado (se cerro sola por cupo, a diferencia de una dinamica simplemente desactivada a mano)
+- Ver seccion "Feature: Dinamica Express" mas abajo para el detalle del flujo publico
+
 ## Feature: Banner informativo
 
 Tira delgada que aparece entre el header y las tabs de categorias en el menu publico. Editable desde el dashboard admin.
@@ -467,6 +536,51 @@ Boton en el menu publico que abre un bottom sheet con una bebida aleatoria pre-a
 - `pickRandom(activeFlavors, categories, toppingGroups)` — elige categoria aleatoria → sabor en esa categoria → 1 topping activo
 - `SurpriseDrawer` — bottom sheet que muestra la tarjeta del producto con imagen hero + chips de categoria y topping superpuestos, selector de tamano y botones "Agregar al carrito" / "Otra opcion"
 - El precio es el precio base del tamano elegido (1 topping siempre gratis)
+
+## Feature: Dinamica Express
+
+Pagina publica (`/dinamica`) con preguntas de cultura general que el admin configura desde `/admin/dinamica`. Solo puede haber **una dinamica activa a la vez**.
+
+**Registro (una sola vez por telefono):**
+- El cliente ingresa nombre y telefono. `hasParticipated(dynamicId, phone)` revisa si ya existe `express_participants/{dynamicId}_{phone}` antes de mostrar las preguntas
+- El anti-duplicado esta scopeado **por dinamica activa**: si el admin crea/activa una nueva tanda de preguntas, el mismo telefono puede volver a participar
+- `registerParticipant()` en `src/lib/express.ts` usa el id deterministico `{dynamicId}_{phone}` dentro de una `runTransaction` de Firestore, para que dos envios simultaneos del mismo telefono no puedan crear dos registros (condicion de carrera)
+
+**Preguntas:** mixtas — cada pregunta puede ser `type: "multiple"` (opciones + una correcta marcada por el admin) o `type: "open"` (texto libre), y puede llevar una `imageUrl` opcional que se muestra arriba de las opciones/input. El publico las responde una por una (stepper con pastilla "Pregunta X de Y" + barra de progreso), no todas juntas en una sola pantalla.
+
+**Calificacion y premio:**
+- Las preguntas `type: "multiple"` siempre califican. Las `type: "open"` califican **solo si el admin les definio `correctAnswer`** en `/admin/dinamica` (campo opcional "Respuesta correcta") — si se deja vacio, esa pregunta se guarda pero no cuenta para el resultado
+- La comparacion de texto libre normaliza ambos lados con `trim().toUpperCase()` — no distingue mayusculas/minusculas ni espacios al inicio/fin, pero **no tolera faltas de ortografia**: es coincidencia exacta, no aproximada
+- `totalGraded` = numero de preguntas que calificaron (todas las `multiple` + las `open` con `correctAnswer`). `won = totalGraded > 0 && correctCount === totalGraded` (acerto todas las que calificaban). Si ninguna pregunta califica, `won` siempre es `false`
+- Si `won === true` → pantalla "¡Felicidades, ganaste!" con el logo de Té Sueño enmarcado ("trofeo"), confeti, dos insignias flotantes, y boton para enviar WhatsApp al numero `529969634631` (mismo numero que el flujo de pedidos) con nombre/telefono/dinamica precargados, para que el cliente reclame su premio manualmente
+- Si `won === false` → pantalla "Gracias por jugar" (mismo estilo visual: pastilla, titulo, logo enmarcado) con boton "Ver el menu"; muestra aciertos si `totalGraded > 0`
+- La calificacion se hace **dentro de la transaccion de Firestore** releyendo `express_dynamics/{id}.questions` (no las preguntas que manda el cliente), para no confiar en datos que ya viajaron al navegador
+
+**Cupo de ganadores (`maxWinners`) y conclusion automatica:**
+- El admin puede poner un `maxWinners` opcional (ej. "solo 3 ganadores") en `/admin/dinamica`. Sin limite = campo vacio (`null`)
+- Cada vez que `registerParticipant()` califica a alguien como ganador, la misma transaccion incrementa `winnersCount` en el doc de la dinamica; si `winnersCount >= maxWinners` tras el incremento, esa misma transaccion pone `active: false` y `concludedAt: Date.now()` — la dinamica se cierra sola, atomicamente, sin condicion de carrera aunque dos ganadores lleguen al mismo tiempo
+- El flujo publico revisa el estado real antes de dejar contestar (`handleStart` relee la dinamica) y vuelve a validar en el submit (la transaccion regresa `closed: true` si ya no esta activa) — si se cierra entre que el cliente abre el formulario y envia sus respuestas, ve la pantalla "Esta dinamica ya concluyo" en vez de guardarse un registro fantasma
+- Si alguien entra a `/dinamica` **despues** de que ya se cerro (llego tarde), `getActiveDynamic()` no devuelve nada — en ese caso se hace fallback a `getMostRecentlyConcluded()` (busca la ultima dinamica con `concludedAt` seteado) para mostrarle "'{title}' ya concluyo · Ya se alcanzo el cupo de ganadores" en vez del generico "No hay ninguna dinamica activa". Solo se distingue este mensaje cuando `concludedAt` esta presente (cierre automatico por cupo); si el admin solo la desactivo a mano, se ve el mensaje generico
+- El admin puede reabrir una dinamica concluida con "Activar" y limpiar el contador con "Reiniciar contador de ganadores" (`resetWinners(id)`) si quiere arrancar una ronda nueva desde cero
+
+**`src/lib/express.ts`** — funciones clave:
+- `getActiveDynamic()` / `getDynamics()` / `getDynamic(id)` / `getMostRecentlyConcluded()`
+- `createDynamic()` / `updateDynamic(id, data)` / `deleteDynamic(id)`
+- `setActiveDynamic(id)` — activa esta y desactiva cualquier otra (batch write)
+- `resetWinners(id)` — pone `winnersCount: 0` y limpia `concludedAt`
+- `hasParticipated(dynamicId, phone)` / `registerParticipant({...})` — retorna `{ participant, duplicate, closed }`
+- `getParticipants(dynamicId)` — usado en el admin para listar registros (incluye telefono completo — vista solo de administrador)
+- `getTopWinners(dynamicId, max = 3)` — ganadores ordenados por `timestamp` ascendente (el primero en ganar es el 1er lugar). No hay un sistema de puntajes aparte: como `maxWinners` ya limita quien puede ganar, el orden de victoria **es** el ranking
+- `maskParticipantName(name)` — enmascara para vistas publicas: `"Juan"` → `"J***n"` (primera/ultima letra, 3 asteriscos fijos sin importar el largo real, para no filtrar la longitud del nombre)
+
+### Podio público (pantalla "cerrada")
+
+Cuando una dinámica se concluye automáticamente por cupo de ganadores (`concludedAt` seteado), `/dinamica` muestra un podio con los primeros 3 ganadores (o menos, si hubo menos). Es intencionalmente minimo en cuanto a datos expuestos:
+- Nombre **enmascarado** (`maskParticipantName`), nunca el nombre completo
+- El **teléfono nunca se muestra** en esta vista
+- No hay un botón de "ranking global" ni comparación entre dinámicas distintas — cada podio es de una sola ronda
+
+Si una dinámica se desactivó manualmente (sin `concludedAt`) o no tiene ganadores, no se muestra podio.
 
 ## Roadmap / futuro
 
