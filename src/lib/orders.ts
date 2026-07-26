@@ -30,6 +30,10 @@ export interface Order {
   items?: OrderItem[];
   total?: number;
   phone?: string;
+  // cupon aplicado (opcional)
+  couponCode?: string;
+  discount?: number;
+  subtotal?: number;
   // legacy single-item format
   flavor?: string;
   size?: string;
@@ -129,6 +133,9 @@ export async function saveFullOrder(order: {
   phone?: string;
   orderNumber?: number;
   source?: "whatsapp" | "comanda";
+  couponCode?: string;
+  discount?: number;
+  subtotal?: number;
 }): Promise<void> {
   await addDoc(collection(db, "orders"), {
     ...order,

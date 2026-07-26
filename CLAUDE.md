@@ -223,6 +223,7 @@ Colecciones en Firestore:
 | `settings/banner` | Banner informativo del menú público (`enabled`, `message`)       |
 | `express_dynamics` | Dinamica Express: tandas de preguntas de cultura general (solo una `active` a la vez) |
 | `express_participants` | Registros de participantes por dinamica (nombre, telefono, respuestas) |
+| `coupons`       | Cupones de descuento para el pedido por WhatsApp (doc id = codigo normalizado) |
 
 La config se lee desde variables de entorno `NEXT_PUBLIC_FIREBASE_*`. Ver `src/lib/firebase.ts`.
 
@@ -384,10 +385,49 @@ interface ExpressParticipant {
 ## Flujo de pedido (WhatsApp)
 
 Al confirmar en `BottomCart.tsx`:
-1. Guarda la orden en Firestore coleccion `orders` con `source: "whatsapp"`, `status: "pending"`
-2. Abre WhatsApp al numero `529969634631` con el pedido formateado en texto
+1. Si hay un cupon aplicado, lo vuelve a canjear atomicamente (`redeemCoupon`) — revalida que siga vigente justo antes de enviar, no confia en la validacion que se hizo cuando el cliente lo escribio
+2. Guarda la orden en Firestore coleccion `orders` con `source: "whatsapp"`, `status: "pending"`, y si aplico cupon: `couponCode`, `discount`, `subtotal`
+3. Abre WhatsApp al numero `529969634631` con el pedido formateado en texto (incluye el desglose de subtotal/descuento/total si hay cupon)
 
 El campo de telefono de fidelidad fue eliminado del flujo de pedido publico. La fidelidad se gestiona exclusivamente desde el panel admin (`/admin/loyalty`).
+
+## Feature: Cupones de descuento
+
+Codigos de descuento que el cliente puede aplicar en `BottomCart.tsx` antes de enviar su pedido ("¿Tienes un cupón?").
+
+**Schema `coupons/{codigoNormalizado}`** (`src/lib/coupons.ts`):
+
+```ts
+type DiscountType = "percentage" | "fixed" | "free_items";
+
+interface Coupon {
+  id: string;              // codigo normalizado (mayusculas, sin espacios) — tambien el doc id
+  code: string;             // codigo tal como lo escribio el admin, para mostrar
+  discountType: DiscountType;
+  discountValue?: number;   // 1-100 si es percentage, pesos si es fixed — no aplica a free_items
+  maxFreeItems?: number;    // solo free_items — cuantas bebidas elegibles se hacen gratis
+  excludedCategories?: string[]; // solo free_items — nombres de categoria (ej. "Especiales") que NO cuentan para el regalo
+  startDate: number;        // epoch ms, inicio del dia
+  endDate: number;          // epoch ms, fin del dia
+  maxUses: number;          // limite total de usos, siempre requerido (no hay opcion "ilimitado")
+  usesCount: number;
+  active: boolean;
+  createdAt: number;
+}
+```
+
+**Tipo `free_items` ("bebidas gratis"):** pensado para premios como "ganaste 2 bebidas gratis, pero no aplica en Especiales". `getDiscountAmount()` en `src/lib/coupons.ts` recibe los items del carrito (no solo el subtotal): junta todas las unidades cuya categoria NO esta en `excludedCategories`, las ordena de mas barata a mas cara, y regala las `maxFreeItems` mas economicas — es el criterio mas facil de explicarle a un cliente ("2 gratis" = las 2 mas baratas que sí cuentan, no las que el cliente elija). Si `excludedCategories` esta vacio, aplica a cualquier bebida del pedido.
+
+**Validacion y canje (dos pasos, igual de deliberado que el resto de la app):**
+- `validateCoupon(code)` — solo lee y valida (activo, dentro del rango de fechas, `usesCount < maxUses`), se usa mientras el cliente escribe el codigo en el carrito, para darle feedback inmediato sin gastar un uso
+- `redeemCoupon(id)` — dentro de una `runTransaction`, revalida todo desde cero y solo entonces incrementa `usesCount`. Se llama justo antes de abrir WhatsApp, no cuando el cliente aplica el codigo — asi dos clientes no pueden gastar el mismo ultimo uso en paralelo, y si el cupon vencio/se agoto entre que lo aplico y le dio "Enviar pedido", el pedido se detiene con un mensaje en vez de enviarse con un descuento que ya no aplica
+- Ambas llamadas a Firestore estan envueltas en `try/catch` en `BottomCart.tsx` — un error de permisos o de red muestra un mensaje en vez de dejar el boton "Aplicar"/"Enviar pedido" girando para siempre
+
+**`/admin/(panel)/cupones`** — CRUD de cupones:
+- Lista con badge de estado: VIGENTE, PROGRAMADO (aun no empieza), EXPIRADO, AGOTADO (uso alcanzado), DESACTIVADO (apagado a mano)
+- Crear: codigo, tipo de descuento (monto fijo / porcentaje / bebidas gratis, el admin elige por cupon), valor o cantidad+categorias excluidas segun el tipo, rango de fechas, maximo de usos
+- Editar: todo excepto el codigo (es el doc id, no se puede cambiar sin borrar y recrear)
+- Activar/Desactivar manualmente, eliminar
 
 ## Sistema de fidelidad
 

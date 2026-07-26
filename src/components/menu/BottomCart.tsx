@@ -1,8 +1,9 @@
-import { FC } from "react";
+import { FC, useState } from "react";
 import { CartItem } from ".";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../ui/drawer";
-import { Trash2 } from "lucide-react";
+import { Trash2, Tag, X, Loader2 } from "lucide-react";
 import { saveFullOrder, getNextOrderNumber } from "@/lib/orders";
+import { Coupon, getDiscountAmount, redeemCoupon, validateCoupon } from "@/lib/coupons";
 
 const T = {
   bg:         "#F8FAFC",
@@ -49,9 +50,45 @@ const BottomCart: FC<BottomCartProps> = ({
   onRemoveItem,
   onClearCart,
 }) => {
-  const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
-  const generateWhatsAppMessage = () => {
+  const [couponOpen, setCouponOpen] = useState(false);
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [checkingCoupon, setCheckingCoupon] = useState(false);
+  const [sendingOrder, setSendingOrder] = useState(false);
+
+  const discount = appliedCoupon ? getDiscountAmount(appliedCoupon, items) : 0;
+  const total = subtotal - discount;
+
+  async function handleApplyCoupon() {
+    if (!couponInput.trim() || checkingCoupon) return;
+    setCheckingCoupon(true);
+    try {
+      const result = await validateCoupon(couponInput);
+      if (!result.valid || !result.coupon) {
+        setCouponError(result.reason ?? "Cupón no válido");
+        setAppliedCoupon(null);
+        return;
+      }
+      setAppliedCoupon(result.coupon);
+      setCouponError(null);
+    } catch {
+      setCouponError("No se pudo validar el cupón. Intenta de nuevo.");
+      setAppliedCoupon(null);
+    } finally {
+      setCheckingCoupon(false);
+    }
+  }
+
+  function handleRemoveCoupon() {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError(null);
+  }
+
+  const generateWhatsAppMessage = (finalTotal: number, appliedDiscount: number, couponCode?: string) => {
     let msg = `¡Hola! Me gustaría hacer un pedido en Té Sueño:\n\n`;
     items.forEach((item) => {
       msg += `${item.category} — ${item.name}\n`;
@@ -60,17 +97,55 @@ const BottomCart: FC<BottomCartProps> = ({
         msg += `   • Toppings: ${item.toppings.join(", ")}\n`;
       msg += `   • Cantidad: ${item.quantity}\n\n`;
     });
-    msg += `Total: $${total.toFixed(2)}\n\n¡Gracias!`;
+    if (couponCode && appliedDiscount > 0) {
+      msg += `Subtotal: $${subtotal.toFixed(2)}\n`;
+      msg += `Cupón (${couponCode}): -$${appliedDiscount.toFixed(2)}\n`;
+    }
+    msg += `Total: $${finalTotal.toFixed(2)}\n\n¡Gracias!`;
     return encodeURIComponent(msg);
   };
 
-  const handleWhatsAppOrder = () => {
+  const handleWhatsAppOrder = async () => {
+    if (sendingOrder) return;
+    setSendingOrder(true);
+
+    let discountToApply = 0;
+    let couponCodeToApply: string | undefined;
+
+    if (appliedCoupon) {
+      try {
+        const { redeemed, coupon } = await redeemCoupon(appliedCoupon.id);
+        if (!redeemed || !coupon) {
+          // Se volvió inválido justo ahora (venció o se agotó) — no enviamos
+          // el pedido con un descuento que ya no aplica; el cliente lo quita
+          // o prueba otro código y vuelve a intentar.
+          setSendingOrder(false);
+          setAppliedCoupon(null);
+          setCouponError("Tu cupón dejó de ser válido justo ahora. Quítalo o intenta con otro, y vuelve a enviar tu pedido.");
+          return;
+        }
+        discountToApply = getDiscountAmount(coupon, items);
+        couponCodeToApply = coupon.code;
+      } catch {
+        setSendingOrder(false);
+        setCouponError("No se pudo validar tu cupón. Quítalo o intenta de nuevo.");
+        return;
+      }
+    }
+
+    const finalTotal = subtotal - discountToApply;
+
     window.open(
-      `https://wa.me/529969634631?text=${generateWhatsAppMessage()}`,
+      `https://wa.me/529969634631?text=${generateWhatsAppMessage(finalTotal, discountToApply, couponCodeToApply)}`,
       "_blank"
     );
     onClearCart();
     onClose();
+    setSendingOrder(false);
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError(null);
+    setCouponOpen(false);
 
     getNextOrderNumber()
       .catch(() => undefined)
@@ -84,9 +159,10 @@ const BottomCart: FC<BottomCartProps> = ({
             price:    item.price,
             quantity: item.quantity,
           })),
-          total,
+          total: finalTotal,
           source: "whatsapp",
           ...(orderNumber ? { orderNumber } : {}),
+          ...(couponCodeToApply ? { couponCode: couponCodeToApply, discount: discountToApply, subtotal } : {}),
         }).catch(console.error)
       );
   };
@@ -104,6 +180,8 @@ const BottomCart: FC<BottomCartProps> = ({
           .clear-btn { transition: background 0.15s; }
           .remove-btn:hover { color: #e05555 !important; }
           .remove-btn { transition: color 0.15s; }
+          @keyframes cart-spin { to { transform: rotate(360deg); } }
+          .cart-spin { animation: cart-spin 0.8s linear infinite; }
         `}</style>
 
         {/* Handle */}
@@ -205,8 +283,98 @@ const BottomCart: FC<BottomCartProps> = ({
                 ))}
               </div>
 
+              {/* Cupón */}
+              <div style={{ marginBottom: 14 }}>
+                {appliedCoupon ? (
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                    padding: "10px 14px", borderRadius: 10,
+                    background: T.roseBg, border: `1px solid ${T.roseBorder}`,
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                      <Tag size={15} color={T.rose} style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: T.rose, fontFamily: "var(--font-poppins)" }}>
+                        {appliedCoupon.code} aplicado
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleRemoveCoupon}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: T.rose, display: "flex", padding: 2 }}
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                ) : couponOpen ? (
+                  <div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        value={couponInput}
+                        onChange={(e) => { setCouponInput(e.target.value); setCouponError(null); }}
+                        onKeyDown={(e) => e.key === "Enter" && handleApplyCoupon()}
+                        placeholder="Código de cupón"
+                        style={{
+                          flex: 1, height: 40, borderRadius: 9,
+                          border: `1px solid ${couponError ? "#FCA5A5" : T.border}`,
+                          background: T.bg, padding: "0 12px", fontSize: 13, color: T.text,
+                          outline: "none", fontFamily: "var(--font-poppins)", boxSizing: "border-box",
+                          textTransform: "uppercase",
+                        }}
+                      />
+                      <button
+                        onClick={handleApplyCoupon}
+                        disabled={!couponInput.trim() || checkingCoupon}
+                        style={{
+                          height: 40, padding: "0 16px", borderRadius: 9, border: "none",
+                          background: !couponInput.trim() || checkingCoupon ? T.slate : T.text,
+                          color: !couponInput.trim() || checkingCoupon ? T.mutedLight : "#FFF",
+                          fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-poppins)",
+                          display: "flex", alignItems: "center", gap: 6, flexShrink: 0,
+                        }}
+                      >
+                        {checkingCoupon ? <Loader2 size={14} className="cart-spin" /> : "Aplicar"}
+                      </button>
+                    </div>
+                    {couponError && (
+                      <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "#DC2626", fontFamily: "var(--font-poppins)" }}>
+                        {couponError}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setCouponOpen(true)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      background: "none", border: "none", padding: 0, cursor: "pointer",
+                      color: T.muted, fontSize: 12.5, fontWeight: 600, fontFamily: "var(--font-poppins)",
+                    }}
+                  >
+                    <Tag size={13} />
+                    ¿Tienes un cupón?
+                  </button>
+                )}
+              </div>
+
               {/* Total + actions */}
               <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 16, marginBottom: 8 }}>
+                {appliedCoupon && (
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, color: T.muted, fontFamily: "var(--font-poppins)" }}>Subtotal</span>
+                      <span style={{ fontSize: 12, color: T.muted, fontFamily: "var(--font-poppins)" }}>${subtotal.toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                      <span style={{ fontSize: 12, color: T.olive, fontFamily: "var(--font-poppins)" }}>
+                        {appliedCoupon.discountType === "free_items"
+                          ? `${appliedCoupon.maxFreeItems ?? 1} bebida${(appliedCoupon.maxFreeItems ?? 1) !== 1 ? "s" : ""} gratis (${appliedCoupon.code})`
+                          : `Descuento (${appliedCoupon.code})`}
+                      </span>
+                      <span style={{ fontSize: 12, color: T.olive, fontFamily: "var(--font-poppins)" }}>
+                        -${discount.toFixed(2)}
+                      </span>
+                    </div>
+                  </>
+                )}
                 <div style={{
                   display: "flex", justifyContent: "space-between",
                   alignItems: "baseline", marginBottom: 16,
@@ -228,12 +396,14 @@ const BottomCart: FC<BottomCartProps> = ({
 
                 <button
                   onClick={handleWhatsAppOrder}
+                  disabled={sendingOrder}
                   className="wa-send-btn"
                   style={{
                     width: "100%", height: 54, borderRadius: 14, border: "none",
                     background: T.wa, color: "#FFF",
                     fontSize: 15, fontWeight: 700,
-                    cursor: "pointer",
+                    cursor: sendingOrder ? "not-allowed" : "pointer",
+                    opacity: sendingOrder ? 0.75 : 1,
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
                     marginBottom: 10,
                     fontFamily: "var(--font-poppins)",
@@ -241,8 +411,17 @@ const BottomCart: FC<BottomCartProps> = ({
                     boxShadow: "0 4px 16px rgba(34,197,94,0.28)",
                   }}
                 >
-                  <WaIcon size={18} />
-                  Enviar pedido por WhatsApp
+                  {sendingOrder ? (
+                    <>
+                      <Loader2 size={18} className="cart-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <WaIcon size={18} />
+                      Enviar pedido por WhatsApp
+                    </>
+                  )}
                 </button>
 
                 <button
