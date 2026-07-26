@@ -10,6 +10,7 @@ import BottomProduct from "./BottomProduct";
 import BottomCart from "./BottomCart";
 import { Drawer, DrawerContent } from "../ui/drawer";
 import { AlertTriangle } from "lucide-react";
+import { getPrice, getImage, getDesc, getMinPrice } from "./utils";
 
 /* ─── Design tokens — aligned with loyalty card ────────── */
 const T = {
@@ -55,35 +56,9 @@ export interface Category {
 }
 
 /* ─── Helpers ──────────────────────────────────────────── */
-export function getPrice(
-  flavor: Flavor,
-  sizeId: SizeId,
-  category: string,
-  rules: typeof priceRules = priceRules
-): number | null {
-  if (flavor.customPrice) return flavor.customPrice[sizeId];
-  if (category === "frappe")
-    return rules[flavor.tier === "premium" ? "frappePremium" : "frappeClassic"][sizeId];
-  if (["tea", "sodaItaliana", "milkTea"].includes(category))
-    return rules.tea[sizeId];
-  if (category === "specialty") return rules.specialty[sizeId];
-  return null;
-}
-
-const getImage = (p: Flavor, cat: string) =>
-  p.images ? (p.images as Record<string, string>)[cat] ?? null : null;
-
-const getDesc = (p: Flavor, cat: string) =>
-  p.description ? (p.description as Record<string, string>)[cat] ?? null : null;
-
-function getMinPrice(p: Flavor, cat: string, rules: typeof priceRules = priceRules): number {
-  if (p.customPrice) return Math.min(...Object.values(p.customPrice));
-  if (cat === "sodaItaliana") return rules.sodaItaliana.mediano;
-  if (cat === "frappe")
-    return rules[p.tier === "premium" ? "frappePremium" : "frappeClassic"].mediano;
-  if (cat === "specialty") return rules.specialty.mediano;
-  return rules.tea.mediano;
-}
+// getPrice/getImage/getDesc/getMinPrice viven en ./utils (no aca) para que
+// BottomProduct.tsx las importe sin crear un ciclo con este barrel.
+export { getPrice, getImage, getDesc, getMinPrice } from "./utils";
 
 /* ─── Placeholder ──────────────────────────────────────── */
 const Placeholder = ({ name }: { name: string }) => (

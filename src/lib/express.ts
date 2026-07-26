@@ -37,6 +37,7 @@ export interface ExpressDynamic {
   maxWinners?: number | null; // opcional — al alcanzarse se desactiva automaticamente
   winnersCount: number;
   concludedAt?: number | null; // se llena cuando se desactiva automaticamente por cupo de ganadores
+  showClaimButton: boolean; // si es false, la pantalla de "ganaste" no muestra el boton de WhatsApp — el negocio contacta al ganador cuando decida
   createdAt: number;
 }
 
@@ -60,10 +61,15 @@ export interface ExpressParticipant {
 const DYNAMICS_COL = "express_dynamics";
 const PARTICIPANTS_COL = "express_participants";
 
-// Completa `winnersCount`/`maxWinners` para dinamicas creadas antes de agregar
-// el limite de ganadores.
+// Completa campos para dinamicas creadas antes de agregar el limite de
+// ganadores o el toggle del boton de reclamo.
 function withDefaults(id: string, data: Omit<ExpressDynamic, "id">): ExpressDynamic {
-  return { id, ...data, winnersCount: data.winnersCount ?? 0, maxWinners: data.maxWinners ?? undefined };
+  return {
+    id, ...data,
+    winnersCount: data.winnersCount ?? 0,
+    maxWinners: data.maxWinners ?? undefined,
+    showClaimButton: data.showClaimButton ?? true,
+  };
 }
 
 export async function getDynamics(): Promise<ExpressDynamic[]> {
@@ -109,6 +115,7 @@ export async function createDynamic(data: {
     maxWinners: data.maxWinners ?? null,
     winnersCount: 0,
     concludedAt: null,
+    showClaimButton: true,
     createdAt: Date.now(),
   });
   return ref.id;
@@ -116,7 +123,7 @@ export async function createDynamic(data: {
 
 export async function updateDynamic(
   id: string,
-  data: Partial<Pick<ExpressDynamic, "title" | "description" | "questions" | "maxWinners">>
+  data: Partial<Pick<ExpressDynamic, "title" | "description" | "questions" | "maxWinners" | "showClaimButton">>
 ): Promise<void> {
   const ref = doc(db, DYNAMICS_COL, id);
 

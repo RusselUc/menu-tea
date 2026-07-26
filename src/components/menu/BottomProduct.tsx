@@ -1,9 +1,11 @@
 import { FC, useState } from "react";
-import { CartItem, Category, getPrice, Product } from ".";
+import Image from "next/image";
+import { CartItem, Category, Product } from ".";
+import { getDesc, getImage, getPrice } from "./utils";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../ui/drawer";
 import { Flavor, SizeId, sizes, priceRules as staticPriceRules } from "@/data/menu";
 import { ToppingGroup, ToppingItem, DEFAULT_TOPPINGS } from "@/lib/menu-items";
-import { Minus, Plus } from "lucide-react";
+import { Minus, Plus, ShoppingCart, Sparkles } from "lucide-react";
 
 const T = {
   bg:          "#F8FAFC",
@@ -76,6 +78,9 @@ const BottomProduct: FC<BottomProductProps> = ({
 
   const getTotalPrice = () => getPriceWithToppings() * quantity;
 
+  const imageSrc = getImage(product as unknown as Flavor, category.id);
+  const description = getDesc(product as unknown as Flavor, category.id);
+
   const handleAdd = () => {
     onAddToCart({
       productId: product.id,
@@ -112,29 +117,56 @@ const BottomProduct: FC<BottomProductProps> = ({
           margin: "12px auto 0",
         }} />
 
-        <DrawerHeader style={{ paddingBottom: 0 }}>
-          <DrawerTitle style={{
-            fontSize: 22, fontWeight: 700,
-            letterSpacing: "-0.02em", color: T.text,
-            fontFamily: "var(--font-poppins)",
-          }}>
-            {product?.name}
-          </DrawerTitle>
-          <p style={{
-            margin: "4px 0 0", fontSize: 11, fontWeight: 500,
-            color: T.olive, letterSpacing: "0.1em",
-            textTransform: "uppercase", fontFamily: "var(--font-poppins)",
-          }}>
-            {category.name}
-          </p>
-        </DrawerHeader>
-
         {/* Scrollable body */}
         <div style={{
           padding: "16px 20px 0",
           overflowY: "auto", flex: 1,
           display: "flex", flexDirection: "column", gap: 22,
         }}>
+
+          {/* Hero image */}
+          {imageSrc && (
+            <div style={{
+              width: "100%", height: 190, flexShrink: 0,
+              borderRadius: 20, overflow: "hidden",
+              border: `1px solid ${T.roseBorder}`,
+            }}>
+              {/* flexShrink:0 es la parte que importa: este div vive dentro
+                  de un flex-column con overflow-y:auto — sin esto, flexbox
+                  lo encoge a casi 0 para hacerle espacio al texto de abajo
+                  en vez de dejar que el contenedor haga scroll. */}
+              <Image
+                src={imageSrc} alt={product.name}
+                width={600} height={190} quality={90}
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              />
+            </div>
+          )}
+
+          <DrawerHeader style={{ padding: 0, textAlign: "center" }}>
+            <p style={{
+              margin: 0, fontSize: 11, fontWeight: 600,
+              color: T.rose, letterSpacing: "0.1em",
+              textTransform: "uppercase", fontFamily: "var(--font-poppins)",
+            }}>
+              {category.name}
+            </p>
+            <DrawerTitle style={{
+              margin: "4px 0 0", fontSize: 24, fontWeight: 700,
+              letterSpacing: "-0.02em", color: T.text,
+              fontFamily: "var(--font-poppins)",
+            }}>
+              {product?.name}
+            </DrawerTitle>
+            {description && (
+              <p style={{
+                margin: "8px 0 0", fontSize: 13, color: T.muted,
+                lineHeight: 1.55, fontFamily: "var(--font-poppins)",
+              }}>
+                {description}
+              </p>
+            )}
+          </DrawerHeader>
 
           {/* Size */}
           <div>
@@ -178,15 +210,23 @@ const BottomProduct: FC<BottomProductProps> = ({
 
           {/* Topping note */}
           <div style={{
-            padding: "9px 13px", borderRadius: 12,
+            display: "flex", alignItems: "flex-start", gap: 9,
+            padding: "10px 13px", borderRadius: 12,
             background: T.roseBg,
             border: `1px solid ${T.roseBorder}`,
           }}>
+            <div style={{
+              width: 20, height: 20, borderRadius: "50%", flexShrink: 0, marginTop: 1,
+              background: T.rose, color: "#FFF",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Sparkles size={11} />
+            </div>
             <p style={{
               margin: 0, fontSize: 11, fontWeight: 400,
               color: T.rose, fontFamily: "var(--font-poppins)", lineHeight: 1.5,
             }}>
-              Incluye 1 topping gratis · Cada topping adicional +$10
+              Incluye <strong style={{ fontWeight: 700 }}>1 topping gratis</strong>. Cada topping adicional tiene un costo de +$10.
             </p>
           </div>
 
@@ -286,14 +326,18 @@ const BottomProduct: FC<BottomProductProps> = ({
               background: T.rose, color: "#FFF",
               fontSize: 15, fontWeight: 600,
               cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "0 20px",
               fontFamily: "var(--font-poppins)",
               letterSpacing: "-0.01em",
               boxShadow: "0 2px 12px rgba(205,87,106,0.25)",
             }}
           >
-            <Plus size={16} />
-            Añadir al carrito — ${getTotalPrice().toFixed(2)}
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <ShoppingCart size={17} />
+              Añadir al carrito
+            </span>
+            <span>${getTotalPrice().toFixed(2)}</span>
           </button>
         </div>
       </DrawerContent>

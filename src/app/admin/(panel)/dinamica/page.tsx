@@ -70,6 +70,7 @@ export default function DinamicaExpressPage() {
   const [questionImageFiles, setQuestionImageFiles] = useState<Record<string, File>>({});
   const [questionImagePreviews, setQuestionImagePreviews] = useState<Record<string, string>>({});
   const [maxWinners, setMaxWinners] = useState("");
+  const [showClaimButton, setShowClaimButton] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activating, setActivating] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -101,6 +102,7 @@ export default function DinamicaExpressPage() {
       Object.fromEntries(dynamic.questions.filter((q) => q.imageUrl).map((q) => [q.id, q.imageUrl as string]))
     );
     setMaxWinners(dynamic.maxWinners ? String(dynamic.maxWinners) : "");
+    setShowClaimButton(dynamic.showClaimButton ?? true);
     setView("edit");
     setParticipantsLoading(true);
     getParticipants(dynamic.id).then((p) => {
@@ -213,6 +215,7 @@ export default function DinamicaExpressPage() {
       description: description.trim(),
       questions: cleaned,
       maxWinners: parsedMax ?? null,
+      showClaimButton,
     });
     setQuestionImageFiles({});
     // Se relee de Firestore porque updateDynamic() puede concluir la dinámica
@@ -452,6 +455,40 @@ export default function DinamicaExpressPage() {
                 {resetting ? "Reiniciando..." : "Reiniciar contador de ganadores"}
               </button>
             )}
+          </div>
+
+          {/* Botón de reclamo automático */}
+          <div style={{
+            background: T.white, border: `1px solid ${T.border}`, borderRadius: 12,
+            padding: "16px 20px", marginBottom: 12,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+          }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: T.text }}>
+                Botón para reclamar premio
+              </p>
+              <p style={{ margin: "3px 0 0", fontSize: 11.5, color: T.muted, lineHeight: 1.5 }}>
+                {showClaimButton
+                  ? "El ganador ve un botón para reclamar su premio por WhatsApp de inmediato."
+                  : "El ganador no ve ningún botón — ustedes deciden cuándo contactarlo para entregar el premio."}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowClaimButton((v) => !v)}
+              role="switch"
+              aria-checked={showClaimButton}
+              style={{
+                width: 44, height: 26, borderRadius: 999, flexShrink: 0, border: "none", cursor: "pointer",
+                background: showClaimButton ? T.olive : T.border,
+                position: "relative", transition: "background 0.2s",
+              }}
+            >
+              <span style={{
+                position: "absolute", top: 3, left: showClaimButton ? 21 : 3,
+                width: 20, height: 20, borderRadius: "50%", background: T.white,
+                boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s",
+              }} />
+            </button>
           </div>
 
           {/* Título y descripción */}
