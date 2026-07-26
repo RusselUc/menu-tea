@@ -38,6 +38,7 @@ export interface ExpressDynamic {
   winnersCount: number;
   concludedAt?: number | null; // se llena cuando se desactiva automaticamente por cupo de ganadores
   showClaimButton: boolean; // si es false, la pantalla de "ganaste" no muestra el boton de WhatsApp — el negocio contacta al ganador cuando decida
+  showPodium: boolean; // el admin controla si el podio (top 3 ganadores) se muestra en /dinamica una vez que esta dinamica ya no esta activa (sin importar si se desactivo sola o a mano)
   createdAt: number;
 }
 
@@ -70,6 +71,7 @@ function withDefaults(id: string, data: Omit<ExpressDynamic, "id">): ExpressDyna
     winnersCount: data.winnersCount ?? 0,
     maxWinners: data.maxWinners ?? undefined,
     showClaimButton: data.showClaimButton ?? true,
+    showPodium: data.showPodium ?? false,
   };
 }
 
@@ -94,12 +96,13 @@ export async function getActiveDynamic(): Promise<ExpressDynamic | null> {
 }
 
 // Cuando no hay ninguna dinámica activa, esto le permite a la página pública
-// distinguir "ya hubo una y se llenó el cupo de ganadores" de "nunca hubo nada".
-export async function getMostRecentlyConcluded(): Promise<ExpressDynamic | null> {
+// distinguir "ya hubo una que vale la pena mostrar" (se concluyó sola por
+// cupo, o el admin activó el podio a mano) de "nunca hubo nada". getDynamics()
+// ya viene ordenado por createdAt desc, así que el primer match es el más
+// reciente.
+export async function getMostRecentClosed(): Promise<ExpressDynamic | null> {
   const all = await getDynamics();
-  const concluded = all.filter((d) => !!d.concludedAt);
-  concluded.sort((a, b) => (b.concludedAt ?? 0) - (a.concludedAt ?? 0));
-  return concluded[0] ?? null;
+  return all.find((d) => !d.active && (!!d.concludedAt || d.showPodium)) ?? null;
 }
 
 export async function createDynamic(data: {
@@ -117,6 +120,7 @@ export async function createDynamic(data: {
     winnersCount: 0,
     concludedAt: null,
     showClaimButton: true,
+    showPodium: false,
     createdAt: Date.now(),
   });
   return ref.id;
@@ -124,7 +128,7 @@ export async function createDynamic(data: {
 
 export async function updateDynamic(
   id: string,
-  data: Partial<Pick<ExpressDynamic, "title" | "description" | "questions" | "maxWinners" | "showClaimButton">>
+  data: Partial<Pick<ExpressDynamic, "title" | "description" | "questions" | "maxWinners" | "showClaimButton" | "showPodium">>
 ): Promise<void> {
   const ref = doc(db, DYNAMICS_COL, id);
 

@@ -100,6 +100,7 @@ export default function DinamicaExpressPage() {
   const [questionImagePreviews, setQuestionImagePreviews] = useState<Record<string, string>>({});
   const [maxWinners, setMaxWinners] = useState("");
   const [showClaimButton, setShowClaimButton] = useState(true);
+  const [showPodium, setShowPodium] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activating, setActivating] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -135,6 +136,7 @@ export default function DinamicaExpressPage() {
     );
     setMaxWinners(dynamic.maxWinners ? String(dynamic.maxWinners) : "");
     setShowClaimButton(dynamic.showClaimButton ?? true);
+    setShowPodium(dynamic.showPodium ?? false);
     setView("edit");
     setParticipantsLoading(true);
     getParticipants(dynamic.id).then((p) => {
@@ -253,6 +255,7 @@ export default function DinamicaExpressPage() {
       questions: cleaned,
       maxWinners: parsedMax ?? null,
       showClaimButton,
+      showPodium,
     });
     setQuestionImageFiles({});
     // Se relee de Firestore porque updateDynamic() puede concluir la dinámica
@@ -548,6 +551,40 @@ export default function DinamicaExpressPage() {
             >
               <span style={{
                 position: "absolute", top: 3, left: showClaimButton ? 21 : 3,
+                width: 20, height: 20, borderRadius: "50%", background: T.white,
+                boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s",
+              }} />
+            </button>
+          </div>
+
+          {/* Podio público */}
+          <div style={{
+            background: T.white, border: `1px solid ${T.border}`, borderRadius: 12,
+            padding: "16px 20px", marginBottom: 12,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+          }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: T.text }}>
+                Mostrar podio en /dinamica
+              </p>
+              <p style={{ margin: "3px 0 0", fontSize: 11.5, color: T.muted, lineHeight: 1.5 }}>
+                {showPodium
+                  ? "Cuando esta dinámica esté desactivada, los clientes verán el podio con los primeros 3 ganadores (nombre enmascarado, sin teléfono)."
+                  : "Cuando la desactives, los clientes solo verán el mensaje de cierre, sin podio."}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowPodium((v) => !v)}
+              role="switch"
+              aria-checked={showPodium}
+              style={{
+                width: 44, height: 26, borderRadius: 999, flexShrink: 0, border: "none", cursor: "pointer",
+                background: showPodium ? T.olive : T.border,
+                position: "relative", transition: "background 0.2s",
+              }}
+            >
+              <span style={{
+                position: "absolute", top: 3, left: showPodium ? 21 : 3,
                 width: 20, height: 20, borderRadius: "50%", background: T.white,
                 boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s",
               }} />

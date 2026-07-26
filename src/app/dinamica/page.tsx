@@ -10,7 +10,7 @@ import {
   ExpressParticipant,
   getActiveDynamic,
   getDynamic,
-  getMostRecentlyConcluded,
+  getMostRecentClosed,
   getTopWinners,
   hasParticipated,
   maskParticipantName,
@@ -537,7 +537,7 @@ export default function DinamicaPage() {
   const [topWinners, setTopWinners] = useState<ExpressParticipant[]>([]);
 
   useEffect(() => {
-    if (stage !== "closed" || !dynamic?.concludedAt) return;
+    if (stage !== "closed" || !dynamic?.showPodium) return;
     getTopWinners(dynamic.id, 3)
       .then(setTopWinners)
       .catch(() => setTopWinners([]));
@@ -547,8 +547,8 @@ export default function DinamicaPage() {
     getActiveDynamic()
       .then(async (d) => {
         if (d) { setDynamic(d); setStage("register"); return; }
-        const concluded = await getMostRecentlyConcluded();
-        if (concluded) { setDynamic(concluded); setStage("closed"); return; }
+        const closed = await getMostRecentClosed();
+        if (closed) { setDynamic(closed); setStage("closed"); return; }
         setStage("none");
       })
       .catch(() => setStage("none"));
@@ -661,12 +661,14 @@ export default function DinamicaPage() {
         <CupStage cup={<TeaCup variant="empty" fillPercent={0} pearlCount={0} muted sash />} />
         <Panel>
           <Headline>&quot;{dynamic.title}&quot; ya llegó a su fin</Headline>
-          <p style={{ margin: dynamic.concludedAt && topWinners.length > 0 ? "0 0 22px" : 0, fontSize: 13.5, color: T.muted, textAlign: "center", lineHeight: 1.6 }}>
+          <p style={{ margin: dynamic.showPodium && topWinners.length > 0 ? "0 0 22px" : 0, fontSize: 13.5, color: T.muted, textAlign: "center", lineHeight: 1.6 }}>
             {dynamic.concludedAt
               ? "Gracias a quienes participaron — ya se alcanzó el cupo de ganadores y se entregaron los premios de esta ronda."
+              : dynamic.showPodium
+              ? "Gracias a quienes participaron en esta ronda — aquí están los ganadores."
               : "No está disponible en este momento. Síguenos para la próxima ronda."}
           </p>
-          {dynamic.concludedAt && topWinners.length > 0 && <Podium winners={topWinners} />}
+          {dynamic.showPodium && topWinners.length > 0 && <Podium winners={topWinners} />}
         </Panel>
       </Shell>
     );
