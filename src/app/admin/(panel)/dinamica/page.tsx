@@ -295,12 +295,17 @@ export default function DinamicaExpressPage() {
     showToast("Contador de ganadores reiniciado");
   }
 
+  function giftLink(c: Coupon): string {
+    return `${window.location.origin}/regalo/${c.id}`;
+  }
+
   function sendCouponWhatsApp(p: ExpressParticipant, c: Coupon) {
     const msg = encodeURIComponent(
       `¡Hola ${p.name.trim()}! 🎉 Ganaste en la dinámica "${current?.title ?? ""}" de Té Sueño.\n\n` +
       `🎁 Tu premio: ${couponHeadline(c)}\n` +
       `Código: ${c.code}\n` +
-      `Válido hasta ${formatCouponDate(c.endDate)}`
+      `Válido hasta ${formatCouponDate(c.endDate)}\n\n` +
+      `${giftLink(c)}`
     );
     window.open(`https://wa.me/52${p.phone}?text=${msg}`, "_blank");
   }
