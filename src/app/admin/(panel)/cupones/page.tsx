@@ -10,7 +10,7 @@ import {
   updateCoupon,
 } from "@/lib/coupons";
 import { categories } from "@/data/menu";
-import { Tag, Percent, DollarSign, Gift, Shuffle } from "lucide-react";
+import { Tag, Percent, DollarSign, Gift, Shuffle, Copy, Check, Send } from "lucide-react";
 
 const CATEGORY_NAMES = categories.map((c) => c.name);
 
@@ -62,6 +62,13 @@ function formatDate(ms: number): string {
   return new Date(ms).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function discountHeadline(c: Coupon): string {
+  if (c.discountType === "fixed") return `$${c.discountValue} de descuento`;
+  if (c.discountType === "percentage") return `${c.discountValue}% de descuento`;
+  const n = c.maxFreeItems ?? 1;
+  return `${n} bebida${n !== 1 ? "s" : ""} gratis`;
+}
+
 function couponStatus(c: Coupon): { label: string; bg: string; border: string; color: string } {
   const now = Date.now();
   if (!c.active) return { label: "DESACTIVADO", bg: T.slate, border: T.border, color: T.muted };
@@ -91,6 +98,8 @@ export default function CuponesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [shareId, setShareId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => { load(); }, []);
 
@@ -198,6 +207,26 @@ export default function CuponesPage() {
     await deleteCoupon(c.id);
     setCoupons((prev) => prev.filter((x) => x.id !== c.id));
     if (editingId === c.id) closeForm();
+  }
+
+  function giftLink(c: Coupon): string {
+    return `${window.location.origin}/regalo/${c.id}`;
+  }
+
+  function copyGiftLink(c: Coupon) {
+    navigator.clipboard.writeText(giftLink(c));
+    setCopiedId(c.id);
+    setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  function whatsAppGiftUrl(c: Coupon): string {
+    const msg =
+      `🎁 ¡Tengo un regalo para ti de Té Sueño!\n\n` +
+      `${discountHeadline(c)}\n` +
+      `Código: ${c.code}\n` +
+      `Válido hasta ${formatDate(c.endDate)}\n\n` +
+      `Cánjialo aquí: ${giftLink(c)}`;
+    return `https://wa.me/?text=${encodeURIComponent(msg)}`;
   }
 
   return (
@@ -481,6 +510,13 @@ export default function CuponesPage() {
                 </p>
                 <div style={{ display: "flex", gap: 14 }}>
                   <button
+                    onClick={() => setShareId(shareId === c.id ? null : c.id)}
+                    style={{ display: "flex", alignItems: "center", gap: 5, border: "none", background: "transparent", color: shareId === c.id ? T.rose : T.text, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-poppins)", padding: 0 }}
+                  >
+                    <Gift size={13} />
+                    Regalo
+                  </button>
+                  <button
                     onClick={() => openEdit(c)}
                     style={{ border: "none", background: "transparent", color: T.text, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-poppins)", padding: 0 }}
                   >
@@ -499,6 +535,56 @@ export default function CuponesPage() {
                     Eliminar
                   </button>
                 </div>
+
+                {shareId === c.id && (
+                  <div style={{
+                    marginTop: 12, padding: "12px 14px", borderRadius: 10,
+                    background: T.roseBg, border: `1px solid ${T.roseBorder}`,
+                    display: "flex", flexDirection: "column", gap: 8,
+                  }}>
+                    <p style={{ margin: 0, fontSize: 11, color: T.rose, fontWeight: 600 }}>
+                      Comparte este cupón como gift card
+                    </p>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input
+                        readOnly
+                        value={giftLink(c)}
+                        onFocus={(e) => e.target.select()}
+                        style={{
+                          flex: 1, height: 34, borderRadius: 7, border: `1px solid ${T.roseBorder}`,
+                          background: T.white, padding: "0 10px", fontSize: 11.5, color: T.secondary,
+                          outline: "none", fontFamily: "var(--font-poppins)",
+                        }}
+                      />
+                      <button
+                        onClick={() => copyGiftLink(c)}
+                        title="Copiar link"
+                        style={{
+                          display: "flex", alignItems: "center", gap: 5, flexShrink: 0,
+                          height: 34, padding: "0 10px", borderRadius: 7,
+                          border: `1px solid ${T.roseBorder}`, background: T.white, color: T.rose,
+                          fontSize: 11.5, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-poppins)",
+                        }}
+                      >
+                        {copiedId === c.id ? <Check size={13} /> : <Copy size={13} />}
+                        {copiedId === c.id ? "Copiado" : "Copiar"}
+                      </button>
+                    </div>
+                    <a
+                      href={whatsAppGiftUrl(c)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                        height: 36, borderRadius: 7, background: "#22C55E", color: T.white,
+                        fontSize: 12, fontWeight: 600, textDecoration: "none", fontFamily: "var(--font-poppins)",
+                      }}
+                    >
+                      <Send size={13} />
+                      Enviar por WhatsApp
+                    </a>
+                  </div>
+                )}
               </div>
             );
           })

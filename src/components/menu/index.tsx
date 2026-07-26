@@ -132,9 +132,17 @@ const Menu = () => {
   const [menuLoading, setMenuLoading] = useState(true);
   const [banner, setBanner] = useState<BannerSettings | null>(null);
   const [isFbia, setIsFbia] = useState(false);
+  const [giftCouponCode, setGiftCouponCode] = useState<string | null>(null);
 
   useEffect(() => {
     setIsFbia(/FBAN|FBAV|FB_IAB/i.test(navigator.userAgent));
+  }, []);
+
+  // Llega desde el link de gift card (/regalo/[code] -> "Usar mi regalo ahora")
+  // para que el cupon quede precargado en el carrito.
+  useEffect(() => {
+    const cupon = new URLSearchParams(window.location.search).get("cupon");
+    if (cupon) setGiftCouponCode(cupon);
   }, []);
 
   useEffect(() => {
@@ -522,6 +530,7 @@ const Menu = () => {
         onClose={() => setIsCartModalOpen(false)}
         onRemoveItem={handleRemoveFromCart}
         onClearCart={handleClearCart}
+        initialCouponCode={giftCouponCode}
       />
 
       {randomDraw && (

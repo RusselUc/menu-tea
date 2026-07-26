@@ -1,4 +1,4 @@
-import { FC, useState } from "react";
+import { FC, useEffect, useState } from "react";
 import { CartItem } from ".";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "../ui/drawer";
 import { Trash2, Tag, X, Loader2 } from "lucide-react";
@@ -35,6 +35,7 @@ interface BottomCartProps {
   onClose: () => void;
   onRemoveItem: (itemId: string) => void;
   onClearCart: () => void;
+  initialCouponCode?: string | null; // llega del link de gift card (/regalo/[code])
 }
 
 const SIZE_LABELS: Record<string, string> = {
@@ -49,6 +50,7 @@ const BottomCart: FC<BottomCartProps> = ({
   items,
   onRemoveItem,
   onClearCart,
+  initialCouponCode,
 }) => {
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
@@ -58,6 +60,7 @@ const BottomCart: FC<BottomCartProps> = ({
   const [couponError, setCouponError] = useState<string | null>(null);
   const [checkingCoupon, setCheckingCoupon] = useState(false);
   const [sendingOrder, setSendingOrder] = useState(false);
+  const [giftApplied, setGiftApplied] = useState(false);
 
   const discount = appliedCoupon ? getDiscountAmount(appliedCoupon, items) : 0;
   const total = subtotal - discount;
@@ -81,6 +84,28 @@ const BottomCart: FC<BottomCartProps> = ({
       setCheckingCoupon(false);
     }
   }
+
+  // Precarga y valida automaticamente el cupon que llega del link de gift
+  // card (?cupon=CODE en la pagina principal) — asi el cliente lo ve ya
+  // aplicado al abrir el carrito, en vez de tener que escribirlo a mano.
+  useEffect(() => {
+    if (!initialCouponCode || giftApplied) return;
+    setGiftApplied(true);
+    setCouponInput(initialCouponCode);
+    setCouponOpen(true);
+    setCheckingCoupon(true);
+    validateCoupon(initialCouponCode)
+      .then((result) => {
+        if (result.valid && result.coupon) {
+          setAppliedCoupon(result.coupon);
+          setCouponError(null);
+        } else {
+          setCouponError(result.reason ?? "Cupón no válido");
+        }
+      })
+      .catch(() => setCouponError("No se pudo validar el cupón. Intenta de nuevo."))
+      .finally(() => setCheckingCoupon(false));
+  }, [initialCouponCode, giftApplied]);
 
   function handleRemoveCoupon() {
     setAppliedCoupon(null);

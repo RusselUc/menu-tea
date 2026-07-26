@@ -56,6 +56,7 @@ export interface ExpressParticipant {
   totalGraded: number;
   won: boolean;
   timestamp: number;
+  couponCode?: string; // codigo del cupon de premio enviado por WhatsApp desde /admin/dinamica
 }
 
 const DYNAMICS_COL = "express_dynamics";
@@ -265,6 +266,12 @@ export async function registerParticipant(params: {
 
     return { participant, duplicate: false, closed: false };
   });
+}
+
+// Registra el codigo de cupon de premio ya enviado a un ganador, para no
+// crear/mandar uno nuevo por accidente si el admin vuelve a abrir el panel.
+export async function setParticipantCoupon(participantId: string, couponCode: string): Promise<void> {
+  await updateDoc(doc(db, PARTICIPANTS_COL, participantId), { couponCode });
 }
 
 export async function getParticipants(dynamicId: string): Promise<ExpressParticipant[]> {

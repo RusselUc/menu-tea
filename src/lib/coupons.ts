@@ -55,6 +55,16 @@ export function generateCouponSuffix(length = 5): string {
   return out;
 }
 
+// Lectura publica de un cupon por codigo — usada por la pagina /regalo/[code]
+// para mostrar la gift card. Solo lee, no valida ni consume uso.
+export async function getCouponById(code: string): Promise<Coupon | null> {
+  const id = normalizeCouponCode(code);
+  if (!id) return null;
+  const snap = await getDoc(doc(db, COUPONS_COL, id));
+  if (!snap.exists()) return null;
+  return snap.data() as Coupon;
+}
+
 export async function getCoupons(): Promise<Coupon[]> {
   const q = query(collection(db, COUPONS_COL), orderBy("createdAt", "desc"));
   const snap = await getDocs(q);
@@ -102,6 +112,17 @@ export async function updateCoupon(
 
 export async function deleteCoupon(id: string): Promise<void> {
   await deleteDoc(doc(db, COUPONS_COL, id));
+}
+
+export type CouponStatusLabel = "VIGENTE" | "PROGRAMADO" | "EXPIRADO" | "AGOTADO" | "DESACTIVADO";
+
+export function getCouponStatusLabel(c: Coupon): CouponStatusLabel {
+  const now = Date.now();
+  if (!c.active) return "DESACTIVADO";
+  if (now < c.startDate) return "PROGRAMADO";
+  if (now > c.endDate) return "EXPIRADO";
+  if (c.usesCount >= c.maxUses) return "AGOTADO";
+  return "VIGENTE";
 }
 
 export interface CouponValidation {

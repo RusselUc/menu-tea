@@ -13,9 +13,13 @@ import {
   getParticipants,
   resetWinners,
   setActiveDynamic,
+  setParticipantCoupon,
   updateDynamic,
 } from "@/lib/express";
 import { uploadMenuImageSupabase } from "@/lib/supabase";
+import { Coupon, getCouponStatusLabel, getCoupons } from "@/lib/coupons";
+import Link from "next/link";
+import { MessageCircle } from "lucide-react";
 
 const T = {
   bg: "#F8FAFC",
@@ -57,6 +61,31 @@ function normalizeAnswerText(s: string) {
   return s.trim().toUpperCase();
 }
 
+const COUPON_STATUS_STYLE: Record<ReturnType<typeof getCouponStatusLabel>, { bg: string; border: string; color: string }> = {
+  VIGENTE: { bg: T.greenBg, border: T.greenBorder, color: T.green },
+  PROGRAMADO: { bg: T.roseBg, border: T.roseBorder, color: T.rose },
+  EXPIRADO: { bg: T.slate, border: T.border, color: T.mutedLight },
+  AGOTADO: { bg: T.slate, border: T.border, color: T.mutedLight },
+  DESACTIVADO: { bg: T.slate, border: T.border, color: T.muted },
+};
+
+function couponSummary(c: Coupon): string {
+  if (c.discountType === "fixed") return `-$${c.discountValue}`;
+  if (c.discountType === "percentage") return `-${c.discountValue}%`;
+  return `${c.maxFreeItems ?? 1} gratis`;
+}
+
+function couponHeadline(c: Coupon): string {
+  if (c.discountType === "fixed") return `$${c.discountValue} de descuento`;
+  if (c.discountType === "percentage") return `${c.discountValue}% de descuento`;
+  const n = c.maxFreeItems ?? 1;
+  return `${n} bebida${n !== 1 ? "s" : ""} gratis`;
+}
+
+function formatCouponDate(ms: number): string {
+  return new Date(ms).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 export default function DinamicaExpressPage() {
   const [view, setView] = useState<"list" | "edit">("list");
   const [dynamics, setDynamics] = useState<ExpressDynamic[]>([]);
@@ -77,6 +106,9 @@ export default function DinamicaExpressPage() {
   const [participants, setParticipants] = useState<ExpressParticipant[]>([]);
   const [participantsLoading, setParticipantsLoading] = useState(false);
   const [expandedParticipantId, setExpandedParticipantId] = useState<string | null>(null);
+  const [couponPickerId, setCouponPickerId] = useState<string | null>(null);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [couponsLoading, setCouponsLoading] = useState(false);
 
   useEffect(() => { loadList(); }, []);
 
@@ -108,6 +140,11 @@ export default function DinamicaExpressPage() {
     getParticipants(dynamic.id).then((p) => {
       setParticipants(p);
       setParticipantsLoading(false);
+    });
+    setCouponsLoading(true);
+    getCoupons().then((c) => {
+      setCoupons(c);
+      setCouponsLoading(false);
     });
   }
 
@@ -256,6 +293,27 @@ export default function DinamicaExpressPage() {
     setCurrent({ ...current, winnersCount: 0, concludedAt: null });
     setResetting(false);
     showToast("Contador de ganadores reiniciado");
+  }
+
+  function sendCouponWhatsApp(p: ExpressParticipant, c: Coupon) {
+    const msg = encodeURIComponent(
+      `¡Hola ${p.name.trim()}! 🎉 Ganaste en la dinámica "${current?.title ?? ""}" de Té Sueño.\n\n` +
+      `🎁 Tu premio: ${couponHeadline(c)}\n` +
+      `Código: ${c.code}\n` +
+      `Válido hasta ${formatCouponDate(c.endDate)}`
+    );
+    window.open(`https://wa.me/52${p.phone}?text=${msg}`, "_blank");
+  }
+
+  function findCouponByCode(code: string): Coupon | undefined {
+    return coupons.find((c) => c.code === code || c.id === code);
+  }
+
+  async function handleSelectCoupon(p: ExpressParticipant, c: Coupon) {
+    await setParticipantCoupon(p.id, c.code);
+    setParticipants((prev) => prev.map((x) => (x.id === p.id ? { ...x, couponCode: c.code } : x)));
+    sendCouponWhatsApp(p, c);
+    setCouponPickerId(null);
   }
 
   async function handleDelete() {
@@ -753,6 +811,119 @@ export default function DinamicaExpressPage() {
                         </svg>
                       </div>
                     </button>
+
+                    {p.won && (
+                      <div style={{ padding: "0 20px 14px" }}>
+                        {p.couponCode ? (
+                          <div style={{
+                            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                            background: T.oliveBg, border: `1px solid ${T.oliveBorder}`, borderRadius: 8, padding: "7px 12px",
+                          }}>
+                            <span style={{ fontSize: 11.5, fontWeight: 600, color: T.olive }}>
+                              Cupón enviado: {p.couponCode}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const coupon = findCouponByCode(p.couponCode as string);
+                                if (coupon) sendCouponWhatsApp(p, coupon);
+                                else showToast("No se encontró ese cupón — puede que se haya eliminado");
+                              }}
+                              style={{
+                                border: "none", background: "transparent", color: T.olive,
+                                fontSize: 11.5, fontWeight: 700, cursor: "pointer",
+                                fontFamily: "var(--font-poppins)", textDecoration: "underline", padding: 0,
+                              }}
+                            >
+                              Reenviar
+                            </button>
+                          </div>
+                        ) : couponPickerId === p.id ? (
+                          <div style={{
+                            background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8,
+                            padding: 10, display: "flex", flexDirection: "column", gap: 6,
+                          }}>
+                            {couponsLoading ? (
+                              <p style={{ margin: "4px 0", fontSize: 12, color: T.mutedLight, textAlign: "center" }}>
+                                Cargando cupones...
+                              </p>
+                            ) : coupons.length === 0 ? (
+                              <div style={{ padding: "6px 4px", textAlign: "center" }}>
+                                <p style={{ margin: "0 0 6px", fontSize: 12, color: T.mutedLight }}>
+                                  Aún no has creado ningún cupón.
+                                </p>
+                                <Link
+                                  href="/admin/cupones"
+                                  style={{ fontSize: 12, fontWeight: 600, color: T.rose, textDecoration: "underline" }}
+                                >
+                                  Crear un cupón →
+                                </Link>
+                              </div>
+                            ) : (
+                              <div style={{ maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 5 }}>
+                                {coupons.map((c) => {
+                                  const status = getCouponStatusLabel(c);
+                                  const style = COUPON_STATUS_STYLE[status];
+                                  return (
+                                    <button
+                                      key={c.id}
+                                      type="button"
+                                      onClick={() => handleSelectCoupon(p, c)}
+                                      style={{
+                                        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                                        height: 40, padding: "0 10px", borderRadius: 7,
+                                        border: `1px solid ${T.border}`, background: T.white,
+                                        cursor: "pointer", fontFamily: "var(--font-poppins)", textAlign: "left",
+                                      }}
+                                    >
+                                      <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                                        <span style={{ fontSize: 12.5, fontWeight: 700, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                          {c.code}
+                                        </span>
+                                        <span style={{
+                                          fontSize: 9.5, fontWeight: 700, borderRadius: 4, padding: "1px 5px", flexShrink: 0,
+                                          background: style.bg, color: style.color, border: `1px solid ${style.border}`,
+                                        }}>
+                                          {status}
+                                        </span>
+                                      </span>
+                                      <span style={{ fontSize: 12, fontWeight: 700, color: T.olive, flexShrink: 0 }}>
+                                        {couponSummary(c)}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setCouponPickerId(null)}
+                              style={{
+                                height: 30, borderRadius: 7,
+                                border: `1px solid ${T.border}`, background: T.white, color: T.muted,
+                                fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-poppins)",
+                              }}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setCouponPickerId(p.id)}
+                            style={{
+                              display: "inline-flex", alignItems: "center", gap: 6,
+                              height: 30, padding: "0 12px", borderRadius: 7,
+                              border: `1px solid ${T.oliveBorder}`, background: T.oliveBg, color: T.olive,
+                              fontSize: 11.5, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-poppins)",
+                            }}
+                          >
+                            <MessageCircle size={13} />
+                            Enviar cupón por WhatsApp
+                          </button>
+                        )}
+                      </div>
+                    )}
 
                     {expanded && (
                       <div style={{ padding: "0 20px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
