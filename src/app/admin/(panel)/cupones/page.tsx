@@ -5,11 +5,12 @@ import {
   DiscountType,
   createCoupon,
   deleteCoupon,
+  generateCouponSuffix,
   getCoupons,
   updateCoupon,
 } from "@/lib/coupons";
 import { categories } from "@/data/menu";
-import { Tag, Percent, DollarSign, Gift } from "lucide-react";
+import { Tag, Percent, DollarSign, Gift, Shuffle } from "lucide-react";
 
 const CATEGORY_NAMES = categories.map((c) => c.name);
 
@@ -128,6 +129,12 @@ export default function CuponesPage() {
     setShowForm(true);
   }
 
+  function handleGenerateCode() {
+    const prefix = form.code.trim().replace(/-+$/, "");
+    const suffix = generateCouponSuffix();
+    setForm((f) => ({ ...f, code: prefix ? `${prefix}-${suffix}` : suffix }));
+  }
+
   function toggleExcludedCategory(name: string) {
     setForm((f) => ({
       ...f,
@@ -237,15 +244,37 @@ export default function CuponesPage() {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             <label style={labelStyle}>Código</label>
-            <input
-              value={form.code}
-              onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
-              placeholder="Ej. VERANO10"
-              disabled={!!editingId}
-              style={{ ...inputStyle, textTransform: "uppercase", opacity: editingId ? 0.6 : 1 }}
-            />
-            {editingId && (
+            <div style={{ display: "flex", gap: 6 }}>
+              <input
+                value={form.code}
+                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
+                placeholder="Ej. VERANO10 o TS-TRIVIA-1ER"
+                disabled={!!editingId}
+                style={{ ...inputStyle, textTransform: "uppercase", opacity: editingId ? 0.6 : 1 }}
+              />
+              {!editingId && (
+                <button
+                  type="button"
+                  onClick={handleGenerateCode}
+                  title="Generar código aleatorio"
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6, flexShrink: 0,
+                    height: 38, padding: "0 12px", borderRadius: 8,
+                    border: `1px solid ${T.border}`, background: T.slate, color: T.secondary,
+                    fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-poppins)",
+                  }}
+                >
+                  <Shuffle size={14} />
+                  Generar
+                </button>
+              )}
+            </div>
+            {editingId ? (
               <p style={{ margin: 0, fontSize: 10.5, color: T.mutedLight }}>El código no se puede cambiar una vez creado.</p>
+            ) : (
+              <p style={{ margin: 0, fontSize: 10.5, color: T.mutedLight }}>
+                Escribe un prefijo (opcional) y presiona &quot;Generar&quot; para agregarle un sufijo aleatorio.
+              </p>
             )}
           </div>
 

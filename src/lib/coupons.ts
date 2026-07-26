@@ -42,6 +42,19 @@ export function normalizeCouponCode(code: string): string {
   return code.trim().toUpperCase().replace(/\s+/g, "");
 }
 
+// Sin 0/O/1/I — se prestan a confusion cuando el cliente teclea el codigo a mano.
+const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+// Genera un sufijo aleatorio para armar codigos de cupon (ej. "8XQ4M").
+// El admin puede anteponerle cualquier prefijo antes de generarlo.
+export function generateCouponSuffix(length = 5): string {
+  let out = "";
+  for (let i = 0; i < length; i++) {
+    out += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  }
+  return out;
+}
+
 export async function getCoupons(): Promise<Coupon[]> {
   const q = query(collection(db, COUPONS_COL), orderBy("createdAt", "desc"));
   const snap = await getDocs(q);
