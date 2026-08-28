@@ -15,7 +15,7 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-const BASE_URL = "https://te-sueno-bobba-tea.vercel.app";
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://tesuenobobbatea.site";
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
@@ -94,6 +94,7 @@ export default function RootLayout({
 
   return (
     <html lang="es">
+    <meta property="og:site_name" content="Té Sueño"></meta>
       <body className={`${poppins.variable} antialiased`}>
         <script
           type="application/ld+json"
