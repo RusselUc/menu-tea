@@ -37,8 +37,8 @@ src/
 │   ├── delivery/page.tsx                 # Pantalla de entrega con mapa
 │   ├── share/[sessionId]/page.tsx        # Orden compartida por sesion
 │   ├── admin/
-│   │   ├── page.tsx                      # Login admin (PIN)
-│   │   ├── actions.ts                    # Server action: validateAdminPin()
+│   │   ├── page.tsx                      # Login admin (Google)
+│   │   ├── session.ts                    # useAdminAuth(), signInWithGoogle(), allowlist de correos
 │   │   └── (panel)/
 │   │       ├── layout.tsx                # Layout del panel (requiere sesion) — sidebar + bottom nav
 │   │       ├── comanda/page.tsx          # Comandas en tiempo real
@@ -63,7 +63,7 @@ src/
 ├── data/
 │   └── menu.ts                           # Data estatica de respaldo (sabores, categorias, precios)
 └── lib/
-    ├── firebase.ts                       # Config de Firebase — solo exporta `db` (Firestore)
+    ├── firebase.ts                       # Config de Firebase — exporta `db` (Firestore) y `auth` (Firebase Auth)
     ├── supabase.ts                       # Cliente Supabase + uploadMenuImageSupabase()
     ├── menu-items.ts                     # CRUD Firestore: menu_items, price_rules, toppings
     ├── loyalty.ts                        # Operaciones Firestore para tarjetas de fidelidad
@@ -196,7 +196,7 @@ Manejado con `useState` local en `Menu` (`src/components/menu/index.tsx`). No ha
 ## Variables de entorno
 
 ```
-ADMIN_PIN=                              # PIN del panel admin (solo servidor, sin NEXT_PUBLIC_)
+NEXT_PUBLIC_ADMIN_EMAILS=               # Correos con acceso al panel admin, separados por coma
 NEXT_PUBLIC_FIREBASE_API_KEY=
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=
@@ -453,16 +453,19 @@ interface LoyaltyCard {
 
 ## Panel admin (`/admin`)
 
-Protegido por PIN via server action (`actions.ts` → `validateAdminPin()`). El `ADMIN_PIN` vive en el servidor y nunca se expone al cliente — la action solo devuelve `true/false`.
+Login con **Google via Firebase Auth** (`signInWithPopup`, con fallback a `signInWithRedirect` si el popup se bloquea — p. ej. en la PWA instalada en iOS). Solo entran los correos listados en `NEXT_PUBLIC_ADMIN_EMAILS` (y con `emailVerified`); cualquier otra cuenta de Google se desloguea al instante con el mensaje "no tiene acceso al panel".
 
-### Sesion persistente
+### Sesion
 
-La sesion usa `localStorage` con expiración de **30 días** (no `sessionStorage`). Las funciones viven en `src/app/admin/page.tsx` y se importan desde el layout:
+Las funciones viven en `src/app/admin/session.ts`:
 
-- `setAdminSession()` — guarda `{ v: "1", exp: timestamp }` al hacer login exitoso
-- `checkAdminSession()` — verifica existencia y vigencia del token; lo elimina si expiró
+- `useAdminAuth()` — hook sobre `onAuthStateChanged`; regresa `{ state, user }` con `state` = `"loading" | "admin" | "unauthorized" | "signed-out"`
+- `signInWithGoogle()` / `signOutAdmin()`
+- `isAdminUser(user)` — valida contra el allowlist
 
-El layout (`(panel)/layout.tsx`) llama `checkAdminSession()` en el `useEffect` inicial y redirige a `/admin` si falla. No usar `sessionStorage` — se borra al cerrar la pestaña.
+Firebase Auth persiste la sesion en IndexedDB (no expira al cerrar la pestaña). El layout (`(panel)/layout.tsx`) usa `useAdminAuth()` y redirige a `/admin` si no hay un admin logueado. Boton "Cerrar sesión" al pie del sidebar (desktop) y en la hoja "Más" (mobile).
+
+> El allowlist del cliente solo controla la UI. La proteccion real de los datos debe ir en las reglas de Firestore (`request.auth.token.email in [...]`), que viven en la consola de Firebase, no en el repo.
 
 El layout (`src/app/admin/(panel)/layout.tsx`) incluye:
 - **Sidebar** en desktop (220px, fijo a la izquierda)

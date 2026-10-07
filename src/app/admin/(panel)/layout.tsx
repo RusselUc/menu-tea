@@ -2,9 +2,9 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { BarChart2, Heart, UtensilsCrossed, Receipt, ClipboardList, Package, MoreHorizontal, HelpCircle, Ticket } from "lucide-react";
+import { BarChart2, Heart, UtensilsCrossed, Receipt, ClipboardList, Package, MoreHorizontal, HelpCircle, Ticket, LogOut } from "lucide-react";
 import logoPink from "@/assets/images/logo-pink.png";
-import { checkAdminSession } from "../session";
+import { signOutAdmin, useAdminAuth } from "../session";
 
 const NAV_PRIMARY = [
   { href: "/admin/comanda", label: "Comanda", icon: ClipboardList },
@@ -29,20 +29,21 @@ export default function AdminPanelLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [ready, setReady] = useState(false);
+  const { state, user } = useAdminAuth();
   const [moreOpen, setMoreOpen] = useState(false);
 
   const isMoreActive = NAV_MORE.some((n) => n.href === pathname);
 
   useEffect(() => {
-    if (!checkAdminSession()) {
-      router.replace("/admin");
-    } else {
-      setReady(true);
-    }
-  }, [router]);
+    if (state === "signed-out" || state === "unauthorized") router.replace("/admin");
+  }, [state, router]);
 
-  if (!ready) return null;
+  const handleSignOut = async () => {
+    await signOutAdmin();
+    router.replace("/admin");
+  };
+
+  if (state !== "admin") return null;
 
   return (
     <>
@@ -222,6 +223,24 @@ export default function AdminPanelLayout({
               );
             })}
           </nav>
+
+          <div style={{ marginTop: "auto", padding: "12px 10px", borderTop: "1px solid #F1F5F9" }}>
+            <p style={{
+              margin: "0 0 6px 4px",
+              fontSize: 11, color: "#94A3B8",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              {user?.email}
+            </p>
+            <button
+              className="sidebar-item"
+              onClick={handleSignOut}
+              style={{ width: "100%", background: "none", border: "none", cursor: "pointer" }}
+            >
+              <LogOut size={15} strokeWidth={1.8} />
+              Cerrar sesión
+            </button>
+          </div>
         </aside>
 
         {/* Content */}
@@ -278,6 +297,14 @@ export default function AdminPanelLayout({
                   </Link>
                 );
               })}
+              <button
+                className="more-sheet-item"
+                onClick={handleSignOut}
+                style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid #F1F5F9", cursor: "pointer", color: "#CD576A" }}
+              >
+                <LogOut size={20} strokeWidth={1.8} />
+                Cerrar sesión
+              </button>
             </div>
           </>
         )}
