@@ -9,16 +9,17 @@ import {
   type User,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { getAdminEmails, isOwnerEmail, normalizeEmail } from "@/lib/admins";
 
-// Correos autorizados, separados por coma: NEXT_PUBLIC_ADMIN_EMAILS="a@gmail.com,b@gmail.com"
-const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
-
-export function isAdminUser(user: User | null): boolean {
+// Dueños (NEXT_PUBLIC_ADMIN_EMAILS) + correos dados de alta en /admin/accesos (settings/admins)
+export async function isAdminUser(user: User | null): Promise<boolean> {
   if (!user?.email || !user.emailVerified) return false;
-  return ADMIN_EMAILS.includes(user.email.toLowerCase());
+  if (isOwnerEmail(user.email)) return true;
+  try {
+    return (await getAdminEmails()).includes(normalizeEmail(user.email));
+  } catch {
+    return false;
+  }
 }
 
 export type AdminAuthState = "loading" | "admin" | "unauthorized" | "signed-out";
@@ -30,9 +31,11 @@ export function useAdminAuth() {
 
   useEffect(
     () =>
-      onAuthStateChanged(auth, (u) => {
+      onAuthStateChanged(auth, async (u) => {
         setUser(u);
-        setState(!u ? "signed-out" : isAdminUser(u) ? "admin" : "unauthorized");
+        if (!u) return setState("signed-out");
+        setState("loading");
+        setState((await isAdminUser(u)) ? "admin" : "unauthorized");
       }),
     []
   );

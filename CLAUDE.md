@@ -46,7 +46,8 @@ src/
 │   │       ├── gastos/page.tsx           # Gestion de gastos del negocio
 │   │       ├── menu/page.tsx             # Gestion de productos, precios y toppings
 │   │       ├── loyalty/page.tsx          # Gestion de tarjetas de fidelidad
-│   │       └── dinamica/page.tsx         # Gestion de la Dinamica Express (preguntas y participantes)
+│   │       ├── dinamica/page.tsx         # Gestion de la Dinamica Express (preguntas y participantes)
+│   │       └── accesos/page.tsx          # Correos de Google con acceso al panel
 │   ├── api/
 │   │   └── upload-menu-image/route.ts    # API route: sube imagenes a Supabase con service role
 │   ├── mi-tarjeta/page.tsx               # Vista publica de tarjeta de fidelidad por telefono
@@ -69,6 +70,7 @@ src/
     ├── loyalty.ts                        # Operaciones Firestore para tarjetas de fidelidad
     ├── expenses.ts                       # CRUD Firestore: expenses — gastos del negocio
     ├── orders.ts                         # CRUD Firestore: orders — getOrders, saveFullOrder, subscribeToCommandaOrders
+    ├── admins.ts                         # settings/admins: allowlist de correos del panel (+ dueños por env)
     ├── express.ts                        # CRUD Firestore: express_dynamics, express_participants — Dinamica Express
     └── utils.ts                          # Utilidades (cn, etc.)
 ```
@@ -196,7 +198,7 @@ Manejado con `useState` local en `Menu` (`src/components/menu/index.tsx`). No ha
 ## Variables de entorno
 
 ```
-NEXT_PUBLIC_ADMIN_EMAILS=               # Correos con acceso al panel admin, separados por coma
+NEXT_PUBLIC_ADMIN_EMAILS=               # Correos DUEÑO del panel (siempre tienen acceso), separados por coma
 NEXT_PUBLIC_FIREBASE_API_KEY=
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=
@@ -220,6 +222,7 @@ Colecciones en Firestore:
 | `orders`        | Ordenes guardadas (WhatsApp y comanda interna)                     |
 | `loyalty_cards` | Tarjetas de fidelidad indexadas por telefono                       |
 | `expenses`      | Gastos del negocio (efectivo y tarjeta, con MSI)                   |
+| `settings/admins` | Correos con acceso al panel admin (`{ emails: string[] }`), gestionados en `/admin/accesos` |
 | `settings/banner` | Banner informativo del menú público (`enabled`, `message`)       |
 | `express_dynamics` | Dinamica Express: tandas de preguntas de cultura general (solo una `active` a la vez) |
 | `express_participants` | Registros de participantes por dinamica (nombre, telefono, respuestas) |
@@ -453,7 +456,7 @@ interface LoyaltyCard {
 
 ## Panel admin (`/admin`)
 
-Login con **Google via Firebase Auth** (`signInWithPopup`, con fallback a `signInWithRedirect` si el popup se bloquea — p. ej. en la PWA instalada en iOS). Solo entran los correos listados en `NEXT_PUBLIC_ADMIN_EMAILS` (y con `emailVerified`); cualquier otra cuenta de Google se desloguea al instante con el mensaje "no tiene acceso al panel".
+Login con **Google via Firebase Auth** (`signInWithPopup`, con fallback a `signInWithRedirect` si el popup se bloquea — p. ej. en la PWA instalada en iOS). Solo entran (con `emailVerified`) los **dueños** listados en `NEXT_PUBLIC_ADMIN_EMAILS` y los correos dados de alta en `settings/admins` desde `/admin/accesos`; cualquier otra cuenta de Google se desloguea al instante con el mensaje "no tiene acceso al panel".
 
 ### Sesion
 
@@ -461,7 +464,7 @@ Las funciones viven en `src/app/admin/session.ts`:
 
 - `useAdminAuth()` — hook sobre `onAuthStateChanged`; regresa `{ state, user }` con `state` = `"loading" | "admin" | "unauthorized" | "signed-out"`
 - `signInWithGoogle()` / `signOutAdmin()`
-- `isAdminUser(user)` — valida contra el allowlist
+- `isAdminUser(user)` — async: dueño por env, o correo presente en `settings/admins` (`src/lib/admins.ts`)
 
 Firebase Auth persiste la sesion en IndexedDB (no expira al cerrar la pestaña). El layout (`(panel)/layout.tsx`) usa `useAdminAuth()` y redirige a `/admin` si no hay un admin logueado. Boton "Cerrar sesión" al pie del sidebar (desktop) y en la hoja "Más" (mobile).
 
@@ -471,7 +474,13 @@ El layout (`src/app/admin/(panel)/layout.tsx`) incluye:
 - **Sidebar** en desktop (220px, fijo a la izquierda)
 - **Bottom nav** en mobile (fijo en el footer)
 
-Navegacion: **Comanda → Metricas → Fidelidad → Gastos → Insumos → Menu → Publicaciones → Dinamica Express**
+Navegacion: **Comanda → Metricas → Fidelidad → Gastos → Insumos → Menu → Dinamica Express → Cupones → Accesos**
+
+### `/admin/(panel)/accesos` — Accesos
+
+- Agregar/quitar correos de Google con acceso al panel (`addAdminEmail` / `removeAdminEmail`, `arrayUnion`/`arrayRemove` sobre `settings/admins`)
+- Los dueños (env) aparecen con badge DUEÑO y no se pueden quitar — asi nadie se queda fuera del panel
+- No puedes quitarte a ti mismo
 
 ### `/admin/(panel)/comanda` — Comandas en tiempo real
 
