@@ -1,13 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Crown, Trash2, UserPlus } from "lucide-react";
+import { Check, Crown, Trash2, UserPlus } from "lucide-react";
 import {
+  AdminUser,
   OWNER_EMAILS,
-  addAdminEmail,
-  getAdminEmails,
+  approveAdminUser,
+  deleteAdminUser,
+  grantAdminAccess,
   isOwnerEmail,
   normalizeEmail,
-  removeAdminEmail,
+  subscribeToAdminUsers,
 } from "@/lib/admins";
 import { useAdminAuth } from "../../session";
 
@@ -22,6 +24,8 @@ const T = {
   slate: "#F1F5F9",
   rose: "#E11D48",
   roseBg: "#FFF1F2",
+  green: "#059669",
+  greenBg: "#ECFDF5",
   amber: "#B45309",
   amberBg: "#FFFBEB",
 };
@@ -32,15 +36,24 @@ const inputStyle: React.CSSProperties = {
   outline: "none", fontFamily: "var(--font-poppins)", boxSizing: "border-box",
 };
 
+const sectionLabel: React.CSSProperties = {
+  margin: "0 4px 8px", fontSize: 11, fontWeight: 600, color: T.muted,
+  textTransform: "uppercase", letterSpacing: "0.04em",
+};
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function formatDate(ms: number): string {
+  return new Date(ms).toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
 
 export default function AccesosPage() {
   const { user } = useAdminAuth();
-  const [emails, setEmails] = useState<string[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [newEmail, setNewEmail] = useState("");
   const [saving, setSaving] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const myEmail = user?.email ? normalizeEmail(user.email) : null;
@@ -50,32 +63,36 @@ export default function AccesosPage() {
     setTimeout(() => setToast(null), 2500);
   }
 
-  async function load() {
-    try {
-      setEmails(await getAdminEmails());
-    } catch {
-      showToast("No se pudo cargar la lista");
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(
+    () =>
+      subscribeToAdminUsers(
+        (list) => {
+          setUsers(list.filter((u) => !isOwnerEmail(u.email)));
+          setLoading(false);
+        },
+        () => {
+          setLoading(false);
+          showToast("No se pudo cargar la lista");
+        }
+      ),
+    []
+  );
 
-  useEffect(() => {
-    load();
-  }, []);
+  const pending = users.filter((u) => u.status === "pending");
+  const approved = users.filter((u) => u.status === "approved");
 
   const normalized = normalizeEmail(newEmail);
-  const alreadyListed = isOwnerEmail(normalized) || emails.includes(normalized);
-  const canAdd = EMAIL_RE.test(normalized) && !alreadyListed && !saving;
+  const existing = users.find((u) => u.email === normalized);
+  const alreadyAdmin = isOwnerEmail(normalized) || existing?.status === "approved";
+  const canAdd = EMAIL_RE.test(normalized) && !alreadyAdmin && !saving;
 
   async function handleAdd() {
-    if (!canAdd) return;
+    if (!canAdd || !myEmail) return;
     setSaving(true);
     try {
-      await addAdminEmail(normalized);
+      await grantAdminAccess(normalized, myEmail);
       setNewEmail("");
-      await load();
-      showToast("Acceso agregado");
+      showToast("Acceso otorgado");
     } catch {
       showToast("No se pudo agregar");
     } finally {
@@ -83,15 +100,49 @@ export default function AccesosPage() {
     }
   }
 
-  async function handleRemove(email: string) {
-    setConfirmRemove(null);
+  async function handleApprove(email: string) {
+    if (!myEmail) return;
     try {
-      await removeAdminEmail(email);
-      await load();
-      showToast("Acceso eliminado");
+      await approveAdminUser(email, myEmail);
+      showToast("Acceso otorgado");
+    } catch {
+      showToast("No se pudo aprobar");
+    }
+  }
+
+  async function handleDelete(email: string) {
+    setConfirmDelete(null);
+    try {
+      await deleteAdminUser(email);
+      showToast("Usuario eliminado");
     } catch {
       showToast("No se pudo eliminar");
     }
+  }
+
+  function deleteControls(email: string, label: string) {
+    if (confirmDelete === email) {
+      return (
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => setConfirmDelete(null)} style={smallBtn(T.slate, T.secondary)}>No</button>
+          <button onClick={() => handleDelete(email)} style={smallBtn(T.rose, T.white)}>{label}</button>
+        </div>
+      );
+    }
+    const isMe = email === myEmail;
+    return (
+      <button
+        onClick={() => setConfirmDelete(email)}
+        disabled={isMe}
+        title={isMe ? "No puedes eliminarte a ti mismo" : "Eliminar"}
+        style={{
+          background: "none", border: "none", padding: 6, display: "flex",
+          color: T.mutedLight, cursor: isMe ? "not-allowed" : "pointer", opacity: isMe ? 0.35 : 1,
+        }}
+      >
+        <Trash2 size={16} />
+      </button>
+    );
   }
 
   return (
@@ -116,9 +167,62 @@ export default function AccesosPage() {
         </p>
       </div>
 
-      {/* Agregar */}
-      <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 18px", marginBottom: 16 }}>
-        <p style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 700, color: T.text }}>Dar acceso</p>
+      {/* Solicitudes pendientes */}
+      <p style={sectionLabel}>
+        Solicitudes pendientes {pending.length > 0 && `· ${pending.length}`}
+      </p>
+      <div style={{ ...card, marginBottom: 20 }}>
+        {loading ? (
+          <Empty>Cargando...</Empty>
+        ) : pending.length === 0 ? (
+          <Empty>Nadie está esperando acceso. Cuando alguien inicie sesión con Google aparecerá aquí.</Empty>
+        ) : (
+          pending.map((u) => (
+            <Row key={u.email} user={u} subtitle={`Solicitó ${formatDate(u.createdAt)}`}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                {confirmDelete !== u.email && (
+                  <button onClick={() => handleApprove(u.email)} style={{ ...smallBtn(T.green, T.white), display: "flex", alignItems: "center", gap: 4 }}>
+                    <Check size={14} /> Dar acceso
+                  </button>
+                )}
+                {deleteControls(u.email, "Eliminar")}
+              </div>
+            </Row>
+          ))
+        )}
+      </div>
+
+      {/* Con acceso */}
+      <p style={sectionLabel}>Con acceso</p>
+      <div style={{ ...card, marginBottom: 16 }}>
+        {OWNER_EMAILS.map((email) => (
+          <Row key={email} user={{ email }} subtitle={email === myEmail ? "Tú" : undefined}>
+            <span style={{
+              display: "flex", alignItems: "center", gap: 4,
+              fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
+              color: T.amber, background: T.amberBg, padding: "3px 8px", borderRadius: 999,
+            }}>
+              <Crown size={11} /> DUEÑO
+            </span>
+          </Row>
+        ))}
+        {approved.map((u) => (
+          <Row
+            key={u.email}
+            user={u}
+            subtitle={u.email === myEmail ? "Tú" : u.approvedBy ? `Aprobado por ${u.approvedBy}` : undefined}
+          >
+            {deleteControls(u.email, "Quitar")}
+          </Row>
+        ))}
+      </div>
+
+      {/* Agregar a mano */}
+      <div style={{ ...card, padding: "16px 18px" }}>
+        <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, color: T.text }}>Dar acceso por correo</p>
+        <p style={{ margin: "0 0 10px", fontSize: 12, color: T.muted }}>
+          Para alguien que todavía no ha iniciado sesión.
+        </p>
         <div style={{ display: "flex", gap: 8 }}>
           <input
             type="email"
@@ -144,86 +248,72 @@ export default function AccesosPage() {
             {saving ? "Agregando..." : "Agregar"}
           </button>
         </div>
-        {normalized && alreadyListed && (
+        {normalized && alreadyAdmin && (
           <p style={{ margin: "8px 0 0", fontSize: 12, color: T.muted }}>Ese correo ya tiene acceso.</p>
-        )}
-      </div>
-
-      {/* Lista */}
-      <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-        {OWNER_EMAILS.map((email) => (
-          <Row key={email} email={email} isMe={email === myEmail}>
-            <span style={{
-              display: "flex", alignItems: "center", gap: 4,
-              fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
-              color: T.amber, background: T.amberBg, padding: "3px 8px", borderRadius: 999,
-            }}>
-              <Crown size={11} /> DUEÑO
-            </span>
-          </Row>
-        ))}
-
-        {loading ? (
-          <p style={{ margin: 0, padding: "16px 18px", fontSize: 13, color: T.mutedLight }}>Cargando...</p>
-        ) : (
-          emails
-            .filter((e) => !isOwnerEmail(e))
-            .map((email) => (
-              <Row key={email} email={email} isMe={email === myEmail}>
-                {confirmRemove === email ? (
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => setConfirmRemove(null)} style={smallBtn(T.slate, T.secondary)}>
-                      No
-                    </button>
-                    <button onClick={() => handleRemove(email)} style={smallBtn(T.rose, T.white)}>
-                      Quitar
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setConfirmRemove(email)}
-                    disabled={email === myEmail}
-                    title={email === myEmail ? "No puedes quitarte a ti mismo" : "Quitar acceso"}
-                    style={{
-                      background: "none", border: "none", padding: 6, display: "flex",
-                      color: T.mutedLight, cursor: email === myEmail ? "not-allowed" : "pointer",
-                      opacity: email === myEmail ? 0.35 : 1,
-                    }}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-              </Row>
-            ))
         )}
       </div>
 
       <p style={{ margin: "12px 4px 0", fontSize: 12, color: T.mutedLight, lineHeight: 1.5 }}>
         Los dueños se configuran en la variable <code>NEXT_PUBLIC_ADMIN_EMAILS</code> y no se pueden quitar desde aquí.
+        Si eliminas a alguien y vuelve a iniciar sesión, aparecerá otra vez como solicitud pendiente.
       </p>
     </div>
   );
 }
 
+const card: React.CSSProperties = {
+  background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden",
+};
+
 function smallBtn(bg: string, color: string): React.CSSProperties {
   return {
     height: 30, padding: "0 12px", borderRadius: 7, border: "none",
     background: bg, color, fontSize: 12, fontWeight: 600, cursor: "pointer",
-    fontFamily: "var(--font-poppins)",
+    fontFamily: "var(--font-poppins)", whiteSpace: "nowrap",
   };
 }
 
-function Row({ email, isMe, children }: { email: string; isMe: boolean; children: React.ReactNode }) {
+function Empty({ children }: { children: React.ReactNode }) {
+  return <p style={{ margin: 0, padding: "16px 18px", fontSize: 13, color: T.mutedLight, lineHeight: 1.5 }}>{children}</p>;
+}
+
+function Row({
+  user,
+  subtitle,
+  children,
+}: {
+  user: Pick<AdminUser, "email"> & Partial<Pick<AdminUser, "name" | "photoURL">>;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div style={{
       display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
       padding: "12px 18px", borderBottom: `1px solid ${T.slate}`,
     }}>
-      <div style={{ minWidth: 0 }}>
-        <p style={{ margin: 0, fontSize: 13.5, fontWeight: 500, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {email}
-        </p>
-        {isMe && <p style={{ margin: "1px 0 0", fontSize: 11, color: T.mutedLight }}>Tú</p>}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        {user.photoURL ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={user.photoURL} alt="" width={32} height={32} referrerPolicy="no-referrer" style={{ borderRadius: "50%", flexShrink: 0 }} />
+        ) : (
+          <div style={{
+            width: 32, height: 32, borderRadius: "50%", background: T.slate, color: T.muted, flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 600,
+          }}>
+            {(user.name || user.email).charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div style={{ minWidth: 0 }}>
+          {user.name && (
+            <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {user.name}
+            </p>
+          )}
+          <p style={{ margin: 0, fontSize: user.name ? 12 : 13.5, fontWeight: user.name ? 400 : 500, color: user.name ? T.muted : T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {user.email}
+          </p>
+          {subtitle && <p style={{ margin: "1px 0 0", fontSize: 11, color: T.mutedLight }}>{subtitle}</p>}
+        </div>
       </div>
       {children}
     </div>

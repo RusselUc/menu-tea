@@ -38,7 +38,7 @@ src/
 │   ├── share/[sessionId]/page.tsx        # Orden compartida por sesion
 │   ├── admin/
 │   │   ├── page.tsx                      # Login admin (Google)
-│   │   ├── session.ts                    # useAdminAuth(), signInWithGoogle(), allowlist de correos
+│   │   ├── session.ts                    # useAdminAuth(), signInWithGoogle(), signOutAdmin()
 │   │   └── (panel)/
 │   │       ├── layout.tsx                # Layout del panel (requiere sesion) — sidebar + bottom nav
 │   │       ├── comanda/page.tsx          # Comandas en tiempo real
@@ -47,7 +47,7 @@ src/
 │   │       ├── menu/page.tsx             # Gestion de productos, precios y toppings
 │   │       ├── loyalty/page.tsx          # Gestion de tarjetas de fidelidad
 │   │       ├── dinamica/page.tsx         # Gestion de la Dinamica Express (preguntas y participantes)
-│   │       └── accesos/page.tsx          # Correos de Google con acceso al panel
+│   │       └── accesos/page.tsx          # Solicitudes pendientes + cuentas con acceso al panel
 │   ├── api/
 │   │   └── upload-menu-image/route.ts    # API route: sube imagenes a Supabase con service role
 │   ├── mi-tarjeta/page.tsx               # Vista publica de tarjeta de fidelidad por telefono
@@ -70,7 +70,7 @@ src/
     ├── loyalty.ts                        # Operaciones Firestore para tarjetas de fidelidad
     ├── expenses.ts                       # CRUD Firestore: expenses — gastos del negocio
     ├── orders.ts                         # CRUD Firestore: orders — getOrders, saveFullOrder, subscribeToCommandaOrders
-    ├── admins.ts                         # settings/admins: allowlist de correos del panel (+ dueños por env)
+    ├── admins.ts                         # admin_users: cuentas del panel (pending/approved) + dueños por env
     ├── express.ts                        # CRUD Firestore: express_dynamics, express_participants — Dinamica Express
     └── utils.ts                          # Utilidades (cn, etc.)
 ```
@@ -222,10 +222,10 @@ Colecciones en Firestore:
 | `orders`        | Ordenes guardadas (WhatsApp y comanda interna)                     |
 | `loyalty_cards` | Tarjetas de fidelidad indexadas por telefono                       |
 | `expenses`      | Gastos del negocio (efectivo y tarjeta, con MSI)                   |
-| `settings/admins` | Correos con acceso al panel admin (`{ emails: string[] }`), gestionados en `/admin/accesos` |
 | `settings/banner` | Banner informativo del menú público (`enabled`, `message`)       |
 | `express_dynamics` | Dinamica Express: tandas de preguntas de cultura general (solo una `active` a la vez) |
 | `express_participants` | Registros de participantes por dinamica (nombre, telefono, respuestas) |
+| `admin_users`   | Cuentas de Google que iniciaron sesion en `/admin` (doc id = email normalizado, `status: pending | approved`) |
 | `coupons`       | Cupones de descuento para el pedido por WhatsApp (doc id = codigo normalizado) |
 
 La config se lee desde variables de entorno `NEXT_PUBLIC_FIREBASE_*`. Ver `src/lib/firebase.ts`.
@@ -456,19 +456,32 @@ interface LoyaltyCard {
 
 ## Panel admin (`/admin`)
 
-Login con **Google via Firebase Auth** (`signInWithPopup`, con fallback a `signInWithRedirect` si el popup se bloquea — p. ej. en la PWA instalada en iOS). Solo entran (con `emailVerified`) los **dueños** listados en `NEXT_PUBLIC_ADMIN_EMAILS` y los correos dados de alta en `settings/admins` desde `/admin/accesos`; cualquier otra cuenta de Google se desloguea al instante con el mensaje "no tiene acceso al panel".
+Login con **Google via Firebase Auth** (`signInWithPopup`, con fallback a `signInWithRedirect` si el popup se bloquea — p. ej. en la PWA instalada en iOS). Los **dueños** listados en `NEXT_PUBLIC_ADMIN_EMAILS` siempre entran. Cualquier otra cuenta de Google (con `emailVerified`) queda **registrada** en `admin_users/{email}` con `status: "pending"` la primera vez que inicia sesion, y ve la pantalla "Solicitud enviada" (sin acceso a nada del panel) hasta que un admin la aprueba en `/admin/accesos`.
+
+### Schema `admin_users/{email}`
+
+```ts
+interface AdminUser {
+  email: string;            // normalizado (minusculas), tambien es el doc id
+  name?: string | null;     // displayName de Google
+  photoURL?: string | null;
+  status: "pending" | "approved";
+  createdAt: number;
+  approvedAt?: number;
+  approvedBy?: string;      // email del admin que aprobo
+}
+```
 
 ### Sesion
 
 Las funciones viven en `src/app/admin/session.ts`:
 
-- `useAdminAuth()` — hook sobre `onAuthStateChanged`; regresa `{ state, user }` con `state` = `"loading" | "admin" | "unauthorized" | "signed-out"`
+- `useAdminAuth()` — hook sobre `onAuthStateChanged`; regresa `{ state, user }` con `state` = `"loading" | "admin" | "pending" | "unauthorized" | "signed-out"`. Escucha `admin_users/{email}` con `onSnapshot`: si lo aprueban entra solo, si lo eliminan sale del panel; si el doc no existe lo crea como `pending` (`requestAdminAccess`)
 - `signInWithGoogle()` / `signOutAdmin()`
-- `isAdminUser(user)` — async: dueño por env, o correo presente en `settings/admins` (`src/lib/admins.ts`)
 
 Firebase Auth persiste la sesion en IndexedDB (no expira al cerrar la pestaña). El layout (`(panel)/layout.tsx`) usa `useAdminAuth()` y redirige a `/admin` si no hay un admin logueado. Boton "Cerrar sesión" al pie del sidebar (desktop) y en la hoja "Más" (mobile).
 
-> El allowlist del cliente solo controla la UI. La proteccion real de los datos debe ir en las reglas de Firestore (`request.auth.token.email in [...]`), que viven en la consola de Firebase, no en el repo.
+> El chequeo del cliente solo controla la UI. La proteccion real va en las reglas de Firestore (`isAdmin()` = dueño fijo o `admin_users/{email}.status == 'approved'`), que viven en la consola de Firebase, no en el repo.
 
 El layout (`src/app/admin/(panel)/layout.tsx`) incluye:
 - **Sidebar** en desktop (220px, fijo a la izquierda)
@@ -478,7 +491,9 @@ Navegacion: **Comanda → Metricas → Fidelidad → Gastos → Insumos → Menu
 
 ### `/admin/(panel)/accesos` — Accesos
 
-- Agregar/quitar correos de Google con acceso al panel (`addAdminEmail` / `removeAdminEmail`, `arrayUnion`/`arrayRemove` sobre `settings/admins`)
+- **Solicitudes pendientes** (tiempo real): nombre, foto, correo y fecha; botones "Dar acceso" (`approveAdminUser`) y eliminar (`deleteAdminUser`). Si alguien eliminado vuelve a iniciar sesion, reaparece como pendiente
+- **Con acceso**: dueños + aprobados, con quien los aprobo; "Quitar" borra el registro y lo saca del panel al instante
+- **Dar acceso por correo** a alguien que aun no inicia sesion (`grantAdminAccess`, crea el doc ya `approved`)
 - Los dueños (env) aparecen con badge DUEÑO y no se pueden quitar — asi nadie se queda fuera del panel
 - No puedes quitarte a ti mismo
 

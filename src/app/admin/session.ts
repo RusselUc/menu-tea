@@ -9,36 +9,55 @@ import {
   type User,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { getAdminEmails, isOwnerEmail, normalizeEmail } from "@/lib/admins";
+import { isOwnerEmail, requestAdminAccess, subscribeToAdminUser } from "@/lib/admins";
 
-// Dueños (NEXT_PUBLIC_ADMIN_EMAILS) + correos dados de alta en /admin/accesos (settings/admins)
-export async function isAdminUser(user: User | null): Promise<boolean> {
-  if (!user?.email || !user.emailVerified) return false;
-  if (isOwnerEmail(user.email)) return true;
-  try {
-    return (await getAdminEmails()).includes(normalizeEmail(user.email));
-  } catch {
-    return false;
-  }
-}
-
-export type AdminAuthState = "loading" | "admin" | "unauthorized" | "signed-out";
+// signed-out → no hay sesion de Google
+// pending    → inicio sesion pero un admin aun no le da acceso (queda registrado en admin_users)
+// unauthorized → correo no verificado o error leyendo permisos
+export type AdminAuthState = "loading" | "admin" | "pending" | "unauthorized" | "signed-out";
 
 // Firebase persiste la sesion en IndexedDB; sobrevive a cerrar la pestaña/PWA.
+// Escucha admin_users/{email} en tiempo real: si un admin lo aprueba, entra sin recargar;
+// si le quitan el acceso, sale del panel.
 export function useAdminAuth() {
   const [state, setState] = useState<AdminAuthState>("loading");
   const [user, setUser] = useState<User | null>(null);
 
-  useEffect(
-    () =>
-      onAuthStateChanged(auth, async (u) => {
-        setUser(u);
-        if (!u) return setState("signed-out");
-        setState("loading");
-        setState((await isAdminUser(u)) ? "admin" : "unauthorized");
-      }),
-    []
-  );
+  useEffect(() => {
+    let unsubRecord: (() => void) | undefined;
+
+    const unsubAuth = onAuthStateChanged(auth, (u) => {
+      unsubRecord?.();
+      unsubRecord = undefined;
+      setUser(u);
+
+      if (!u) return setState("signed-out");
+      if (!u.email || !u.emailVerified) return setState("unauthorized");
+      if (isOwnerEmail(u.email)) return setState("admin");
+
+      setState("loading");
+      let requested = false;
+      unsubRecord = subscribeToAdminUser(
+        u.email,
+        (record) => {
+          if (record) return setState(record.status === "approved" ? "admin" : "pending");
+          setState("pending");
+          // Primera vez que entra (o lo eliminaron y volvio a iniciar sesion): se registra
+          if (!requested) {
+            requested = true;
+            requestAdminAccess({ email: u.email!, displayName: u.displayName, photoURL: u.photoURL })
+              .catch(() => setState("unauthorized"));
+          }
+        },
+        () => setState("unauthorized")
+      );
+    });
+
+    return () => {
+      unsubRecord?.();
+      unsubAuth();
+    };
+  }, []);
 
   return { state, user };
 }

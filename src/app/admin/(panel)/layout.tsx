@@ -36,7 +36,7 @@ export default function AdminPanelLayout({
   const isMoreActive = NAV_MORE.some((n) => n.href === pathname);
 
   useEffect(() => {
-    if (state === "signed-out" || state === "unauthorized") router.replace("/admin");
+    if (state !== "loading" && state !== "admin") router.replace("/admin");
   }, [state, router]);
 
   const handleSignOut = async () => {

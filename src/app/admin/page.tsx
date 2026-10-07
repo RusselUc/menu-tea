@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { User } from "firebase/auth";
 import { signInWithGoogle, signOutAdmin, useAdminAuth } from "./session";
 
 const C = {
@@ -34,7 +35,7 @@ function LoginScreen() {
   useEffect(() => {
     if (state === "admin") router.replace("/admin/dashboard");
     if (state === "unauthorized") {
-      setError(`${user?.email ?? "Esta cuenta"} no tiene acceso al panel.`);
+      setError("No se pudo verificar tu acceso. Intenta con otra cuenta.");
       signOutAdmin();
     }
   }, [state, user, router]);
@@ -55,6 +56,10 @@ function LoginScreen() {
   };
 
   const busy = loading || state === "loading" || state === "admin";
+
+  if (state === "pending" && user) {
+    return <PendingScreen user={user} />;
+  }
 
   return (
     <div
@@ -125,6 +130,79 @@ function LoginScreen() {
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Pending screen ──────────────────────────────────────
+// La cuenta ya quedo registrada en admin_users; useAdminAuth escucha el doc y
+// redirige solo en cuanto un admin la aprueba.
+function PendingScreen({ user }: { user: User }) {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: C.cream,
+        fontFamily: "var(--font-poppins)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px",
+        textAlign: "center",
+      }}
+    >
+      <div style={{ fontSize: 40, marginBottom: 12 }}>⏳</div>
+      <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.dark, letterSpacing: "-0.02em" }}>
+        Solicitud enviada
+      </h1>
+      <p style={{ margin: "8px 0 0", fontSize: 13, color: C.muted, maxWidth: 300, lineHeight: 1.5 }}>
+        Un administrador debe darte acceso. En cuanto lo haga, entrarás al panel automáticamente.
+      </p>
+
+      <div
+        style={{
+          marginTop: 24,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          background: C.white,
+          border: `1.5px solid ${C.border}`,
+          borderRadius: 14,
+          padding: "10px 14px",
+          maxWidth: 320,
+          width: "100%",
+        }}
+      >
+        {user.photoURL ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={user.photoURL} alt="" width={32} height={32} style={{ borderRadius: "50%" }} referrerPolicy="no-referrer" />
+        ) : null}
+        <div style={{ minWidth: 0, textAlign: "left" }}>
+          {user.displayName && (
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.text }}>{user.displayName}</p>
+          )}
+          <p style={{ margin: 0, fontSize: 12, color: C.muted, overflow: "hidden", textOverflow: "ellipsis" }}>
+            {user.email}
+          </p>
+        </div>
+      </div>
+
+      <button
+        onClick={() => signOutAdmin()}
+        style={{
+          marginTop: 14,
+          background: "none",
+          border: "none",
+          color: C.rose,
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          fontFamily: "var(--font-poppins)",
+        }}
+      >
+        Usar otra cuenta
+      </button>
     </div>
   );
 }
