@@ -494,7 +494,7 @@ Navegacion: **Comanda → Metricas → Fidelidad → Gastos → Insumos → Menu
 - **Solicitudes pendientes** (tiempo real): nombre, foto, correo y fecha; botones "Dar acceso" (`approveAdminUser`) y eliminar (`deleteAdminUser`). Si alguien eliminado vuelve a iniciar sesion, reaparece como pendiente
 - **Con acceso**: dueños + aprobados, con quien los aprobo; "Quitar" borra el registro y lo saca del panel al instante
 - **Dar acceso por correo** a alguien que aun no inicia sesion (`grantAdminAccess`, crea el doc ya `approved`)
-- Los dueños (env) aparecen con badge DUEÑO y no se pueden quitar — asi nadie se queda fuera del panel
+- Los dueños (env) aparecen en la lista sin badge ni boton de eliminar — asi nadie se queda fuera del panel
 - No puedes quitarte a ti mismo
 
 ### `/admin/(panel)/comanda` — Comandas en tiempo real

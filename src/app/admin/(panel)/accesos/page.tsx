@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Check, Crown, Trash2, UserPlus } from "lucide-react";
+import { Check, Trash2, UserPlus } from "lucide-react";
 import {
   AdminUser,
   OWNER_EMAILS,
@@ -26,8 +26,6 @@ const T = {
   roseBg: "#FFF1F2",
   green: "#059669",
   greenBg: "#ECFDF5",
-  amber: "#B45309",
-  amberBg: "#FFFBEB",
 };
 
 const inputStyle: React.CSSProperties = {
@@ -197,13 +195,7 @@ export default function AccesosPage() {
       <div style={{ ...card, marginBottom: 16 }}>
         {OWNER_EMAILS.map((email) => (
           <Row key={email} user={{ email }} subtitle={email === myEmail ? "Tú" : undefined}>
-            <span style={{
-              display: "flex", alignItems: "center", gap: 4,
-              fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
-              color: T.amber, background: T.amberBg, padding: "3px 8px", borderRadius: 999,
-            }}>
-              <Crown size={11} /> DUEÑO
-            </span>
+            {null}
           </Row>
         ))}
         {approved.map((u) => (
@@ -254,7 +246,6 @@ export default function AccesosPage() {
       </div>
 
       <p style={{ margin: "12px 4px 0", fontSize: 12, color: T.mutedLight, lineHeight: 1.5 }}>
-        Los dueños se configuran en la variable <code>NEXT_PUBLIC_ADMIN_EMAILS</code> y no se pueden quitar desde aquí.
         Si eliminas a alguien y vuelve a iniciar sesión, aparecerá otra vez como solicitud pendiente.
       </p>
     </div>
